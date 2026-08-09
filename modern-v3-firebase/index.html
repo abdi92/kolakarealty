@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="KBR Office">
+  <meta name="description" content="Workspace operasional PT Kolaka Bumi Realty">
+  <title>PT Kolaka Bumi Realty</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" href="./LOGO%20(1).png">
+  <link rel="apple-touch-icon" href="./LOGO%20(1).png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <style>
+    html, body { margin: 0; padding: 0; }
+    #kbr-loading {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      font-family: system-ui, sans-serif; color: #12284D; font-size: 13px; letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"><div id="kbr-loading">Memuat aplikasi...</div></div>
+
+  <script src="./runtime-config.js"></script>
+  <script src="./app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./service-worker.js", { scope: "./" }).catch((error) => {
+          console.error("Service worker gagal didaftarkan:", error);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
+

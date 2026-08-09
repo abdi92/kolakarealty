@@ -1,0 +1,15 @@
+{
+  "name": "kbr-office-firebase-blogger",
+  "version": "4.0.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild app.jsx --bundle --outfile=app.js --format=iife --platform=browser --target=es2020 --minify",
+    "check": "node --check app.js && node formula.test.js && node admin-api.test.js && node architecture.test.js"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.8"
+  },
+  "dependencies": {
+    "firebase": "^12.17.1"
+  }
+}

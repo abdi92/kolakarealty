@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html>
+<html b:css="false" b:defaultwidgetversion="2" b:layoutsVersion="3" b:responsive="true" b:version="2" expr:lang="data:blog.locale" xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.google.com/2005/gml/b" xmlns:data="http://www.google.com/2005/gml/data" xmlns:expr="http://www.google.com/2005/gml/expr">
+<head>
+  <b:include data="blog" name="all-head-content"/>
+  <meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
+  <meta content="PT Kolaka Bumi Realty" name="application-name"/>
+  <meta content="Aplikasi manajemen administrasi PT Kolaka Bumi Realty" name="description"/>
+  <title>PT Kolaka Bumi Realty</title>
+  <b:skin><![CDATA[
+    html, body { width: 100%; min-height: 100%; margin: 0; padding: 0; background: #F4F6F9; }
+    #root { min-height: 100vh; }
+    #kbr-loading { min-height: 100vh; display: grid; place-items: center; color: #12284D; font: 600 13px/1.5 sans-serif; }
+    #main { display: none; }
+  ]]></b:skin>
+</head>
+<body>
+  <div id="root"><div id="kbr-loading">Memuat aplikasi...</div></div>
+  <noscript><div id="kbr-loading">JavaScript wajib diaktifkan.</div></noscript>
+
+  <script><![CDATA[
+    window.KBR_FIREBASE_CONFIG = {
+      apiKey: "AIzaSyCDRozFjsqZcAV0zI4mK4hB8nQO_WKt3e8",
+      authDomain: "kolakarealty-fd4d7.firebaseapp.com",
+      projectId: "kolakarealty-fd4d7",
+      storageBucket: "kolakarealty-fd4d7.firebasestorage.app",
+      messagingSenderId: "470644501131",
+      appId: "1:470644501131:web:edf13682cd79255dff828e",
+      appCheckSiteKey: ""
+    };
+    window.KBR_ADMIN_API_URL = "https://script.google.com/macros/s/AKfycbwrZ5Z_4qOmuZGbqMcfbtWS5xVvdh9UJa-koa4DnBBTIl9hKH6E-_stgAVakAw1OLo/exec";
+    window.KBR_ASSET_BASE_URL = "https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@main/modern-v3-firebase/";
+  ]]></script>
+  <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+  <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@main/modern-v3-firebase/app.js"></script>
+
+  <b:section class="main" id="main" maxwidgets="1" showaddelement="no">
+    <b:widget id="Blog1" locked="true" title="Blog Posts" type="Blog"/>
+  </b:section>
+</body>
+</html>
