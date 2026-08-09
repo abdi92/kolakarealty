@@ -38,6 +38,7 @@ assert.match(bundle, /logo-kolakabumirealty\.png/);
 assert.doesNotMatch(appSource, /LOGO%20\(1\)\.png|LOGO \(1\)\.png/);
 assert.match(appSource, /function SettingsPage/);
 assert.match(appSource, /beforeinstallprompt/);
+assert.match(appSource, /const tagline = escapeHtml\(KOP_SURAT_INFO\.tagline\)/);
 assert.strictEqual(bloggerManifest.start_url, "https://kolakabumirealty.blogspot.com/");
 assert.strictEqual(bloggerManifest.display, "standalone");
 assert.ok(bloggerManifest.icons.some((icon) => icon.purpose === "maskable"));

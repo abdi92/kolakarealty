@@ -244,7 +244,7 @@ function applyAppSettings(record) {
   SIDE.activeBg = ACTIVE_APP_SETTINGS.warnaUtama;
   if (typeof KOP_SURAT_INFO !== "undefined") {
     KOP_SURAT_INFO.tagline = ACTIVE_APP_SETTINGS.tagline;
-    KOP_SURAT_INFO.alamat = `${ACTIVE_APP_SETTINGS.alamat} &nbsp; ${ACTIVE_APP_SETTINGS.telepon}`;
+    KOP_SURAT_INFO.alamat = `${ACTIVE_APP_SETTINGS.alamat} · ${ACTIVE_APP_SETTINGS.telepon}`;
     KOP_SURAT_INFO.email = `Email : ${ACTIVE_APP_SETTINGS.email}`;
     KOP_SURAT_INFO.emailSingkat = `Email : ${ACTIVE_APP_SETTINGS.email}`;
   }
@@ -2927,15 +2927,18 @@ const KOP_SURAT_STYLE = `
 
 function buildKopSuratHtml() {
   const companyName = escapeHtml(BRAND.fullName || "PT. KOLAKA BUMI REALTY");
-  const logo = BRAND.logoSrc || "";
+  const logo = escapeHtml(BRAND.logoSrc || "");
+  const tagline = escapeHtml(KOP_SURAT_INFO.tagline);
+  const alamat = escapeHtml(KOP_SURAT_INFO.alamat);
+  const email = escapeHtml(KOP_SURAT_INFO.email);
   return `
     <div class="kop-kbr">
       ${logo ? `<img src="${logo}" alt="Logo">` : ""}
       <div class="co">
         <h1>${companyName}</h1>
-        <div class="tag">${KOP_SURAT_INFO.tagline}</div>
-        <div class="addr">${KOP_SURAT_INFO.alamat}</div>
-        <div class="addr">${KOP_SURAT_INFO.email}</div>
+        <div class="tag">${tagline}</div>
+        <div class="addr">${alamat}</div>
+        <div class="addr">${email}</div>
       </div>
     </div>
   `;
