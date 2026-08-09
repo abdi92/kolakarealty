@@ -1,9 +1,11 @@
-const CACHE_VERSION = "kbr-office-v2";
+const CACHE_VERSION = "kbr-office-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./offline.html",
+  "./LOGO%20(1).png",
+  "./bachground.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png"
