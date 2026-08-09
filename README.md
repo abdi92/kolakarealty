@@ -27,8 +27,19 @@ Tidak ada Node.js backend, server tambahan, atau database lain.
 |-- README.md             # Panduan ini
 |-- REBUILD_ANALYSIS.md   # Analisis migrasi dan pemetaan API
 |-- TEST_REPORT.md        # Hasil pengujian dan checklist integrasi
+|-- MASTER_PROMPT_MIGRASI_APP_SCRIPT_TO_GITHUB_COPILOT.md
+|                         # Template migrasi dengan VS Code + GitHub Copilot
+|-- MASTER_PROMPT_MIGRASI_APP_SCRIPT_TO_GITHUB_TANPA_COPILOT.md
+|                         # Template migrasi netral untuk developer/tool lain
 `-- Master_Prompt.md      # Spesifikasi migrasi
 ```
+
+## Template Migrasi Aplikasi Lain
+
+- Gunakan [MASTER_PROMPT_MIGRASI_APP_SCRIPT_TO_GITHUB_COPILOT.md](MASTER_PROMPT_MIGRASI_APP_SCRIPT_TO_GITHUB_COPILOT.md) untuk workflow agent di VS Code dengan GitHub Copilot.
+- Gunakan [MASTER_PROMPT_MIGRASI_APP_SCRIPT_TO_GITHUB_TANPA_COPILOT.md](MASTER_PROMPT_MIGRASI_APP_SCRIPT_TO_GITHUB_TANPA_COPILOT.md) untuk developer, tim engineering, konsultan, atau AI coding assistant lain.
+- Edit blok `KONFIGURASI_CUSTOM` di bagian atas prompt sebelum dipakai. Parameter mencakup aplikasi, repository, Apps Script, Spreadsheet, role, fitur, branding, PWA, dan aturan keamanan.
+- Jangan memasukkan nilai password, token, private key, atau secret ke dalam blok konfigurasi yang akan disimpan di GitHub.
 
 ## Fitur
 
