@@ -4,7 +4,7 @@ Tanggal pengujian: 2026-08-09
 
 ## Ringkasan
 
-Migrasi transport dan static frontend telah diuji lokal. Pengujian integrasi yang memerlukan Google Apps Script deployment `/exec`, Spreadsheet terikat, Drive, dan akun pengguna nyata belum dapat dijalankan karena konfigurasi eksternal tersebut tidak tersedia di workspace.
+Migrasi transport dan static frontend telah diuji lokal. Deployment Google Apps Script `/exec` kemudian diberikan dan health check serta action router aman sudah diuji langsung. Pengujian yang memerlukan credential pengguna, perubahan data Spreadsheet, atau akses Drive belum dijalankan agar tidak menebak credential maupun memodifikasi data produksi tanpa konteks record uji.
 
 ## Hasil Lulus
 
@@ -27,12 +27,15 @@ Migrasi transport dan static frontend telah diuji lokal. Pengujian integrasi yan
 | Mobile | Tidak ada horizontal overflow pada login | Lulus |
 | Error handling | Placeholder API menampilkan pesan konfigurasi yang jelas | Lulus |
 | Encoding | Mojibake yang terdeteksi pada source produksi sudah dibersihkan | Lulus |
+| Apps Script | GET `/exec` mengembalikan health JSON `success: true` | Lulus |
+| Apps Script | POST `text/plain` untuk action aman `logout` mengembalikan envelope sukses | Lulus |
+| GitHub Pages | Build dari `main:/` berstatus `built` dan login dirender dari URL produksi | Lulus |
 
 ## Menunggu Deployment
 
 | Area | Alasan |
 |---|---|
-| Login dan logout sesi nyata | Memerlukan URL Apps Script `/exec`, Script Properties, dan Spreadsheet terikat |
+| Login bercredential dan logout sesi nyata | Memerlukan credential akun valid; credential tidak diminta atau ditebak selama pengujian |
 | Dashboard dan read data | Memerlukan session valid dan data Google Sheets |
 | Create, update, delete | Tidak aman dilakukan tanpa deployment dan target Spreadsheet yang terverifikasi |
 | Search global | Memerlukan data dan backend deployed |
