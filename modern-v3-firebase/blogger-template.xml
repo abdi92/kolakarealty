@@ -18,7 +18,7 @@
   <div id="root"><div id="kbr-loading">Memuat aplikasi...</div></div>
   <noscript><div id="kbr-loading">JavaScript wajib diaktifkan.</div></noscript>
 
-  <script><![CDATA[
+  <script>
     window.KBR_FIREBASE_CONFIG = {
       apiKey: "AIzaSyCDRozFjsqZcAV0zI4mK4hB8nQO_WKt3e8",
       authDomain: "kolakarealty-fd4d7.firebaseapp.com",
@@ -30,7 +30,7 @@
     };
     window.KBR_ADMIN_API_URL = "https://script.google.com/macros/s/AKfycbwrZ5Z_4qOmuZGbqMcfbtWS5xVvdh9UJa-koa4DnBBTIl9hKH6E-_stgAVakAw1OLo/exec";
     window.KBR_ASSET_BASE_URL = "https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@main/modern-v3-firebase/";
-  ]]></script>
+  </script>
   <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
   <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
   <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@main/modern-v3-firebase/app.js"></script>

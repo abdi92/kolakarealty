@@ -15,6 +15,7 @@ assert.match(rules, /allow create, update, delete: if false;/);
 assert.match(rules, /request\.resource\.data\.id == recordId/);
 assert.match(rules, /match \/auditLogs\/\{logId\}/);
 assert.doesNotMatch(blogger, /<iframe/i);
+assert.doesNotMatch(blogger, /<script><!\[CDATA\[/i);
 assert.match(blogger, /cdn\.jsdelivr\.net\/gh\/abdi92\/kolakarealty@main/);
 assert.match(adminApi, /accounts:lookup/);
 assert.match(adminApi, /requireAdministrator_/);
