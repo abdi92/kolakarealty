@@ -30,5 +30,9 @@ const settings = derive("pengaturan", { id: "other", warnaUtama: "#2E6FB7", logo
 assert.strictEqual(settings.id, "default");
 assert.throws(() => derive("pengaturan", { warnaUtama: "blue" }), /HEX/);
 assert.throws(() => derive("pengaturan", { logoUrl: "http://example.com/logo.png" }), /HTTPS/);
+const templatedSettings = derive("pengaturan", { customSuratTemplates: [{ id: "tpl-123", nama: "Surat Uji", isi: "Yth. {{namaPihak}}", aktif: true }] });
+assert.strictEqual(templatedSettings.customSuratTemplates[0].nama, "Surat Uji");
+assert.throws(() => derive("pengaturan", { customSuratTemplates: [{ id: "invalid", nama: "Surat", isi: "Isi" }] }), /ID template/);
+assert.throws(() => derive("pengaturan", { customSuratTemplates: Array.from({ length: 11 }, (_, index) => ({ id: `tpl-${index}`, nama: "Surat", isi: "Isi" })) }), /maksimal 10/);
 
 console.log("Firebase Admin API business-rule tests passed.");

@@ -10,6 +10,7 @@
     "esbuild": "0.25.8"
   },
   "dependencies": {
-    "firebase": "^12.17.1"
+    "firebase": "^12.17.1",
+    "mammoth": "^1.10.0"
   }
 }

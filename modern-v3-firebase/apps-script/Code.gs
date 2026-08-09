@@ -274,6 +274,15 @@ function validateAndDerive_(entity, record, existing) {
     ['templateSurat', 'templateKuitansi', 'templateSpk', 'templateDetail'].forEach(function (field) {
       if (String(result[field] || '').length > 5000) throw new Error(field + ' maksimal 5.000 karakter.');
     });
+    var customTemplates = Array.isArray(result.customSuratTemplates) ? result.customSuratTemplates : [];
+    if (customTemplates.length > 10) throw new Error('Template surat maksimal 10 file.');
+    result.customSuratTemplates = customTemplates.map(function (template, index) {
+      var item = template || {};
+      if (!/^tpl-[0-9]+$/.test(String(item.id || ''))) throw new Error('ID template ke-' + (index + 1) + ' tidak valid.');
+      if (!String(item.nama || '').trim() || String(item.nama).length > 120) throw new Error('Nama template wajib diisi dan maksimal 120 karakter.');
+      if (!String(item.isi || '').trim() || String(item.isi).length > 30000) throw new Error('Isi template wajib diisi dan maksimal 30.000 karakter.');
+      return { id: String(item.id), nama: String(item.nama).trim(), isi: String(item.isi), aktif: item.aktif !== false, file: item.file || null };
+    });
     result.id = 'default';
   }
   if (entity === 'approval') {
@@ -451,16 +460,35 @@ function ensureFolder_(name) {
 
 function uploadFile_(session, entity, fileName, mimeType, base64Data) {
   requireAdministrator_(session);
+  entity = String(entity || '').trim();
+  fileName = String(fileName || '').trim();
+  mimeType = String(mimeType || '').toLowerCase();
+  if (entity === 'pengaturan' && session.role !== 'Superadmin') throw new Error('Hanya Superadmin yang dapat mengunggah aset pengaturan.');
   var bytes = Utilities.base64Decode(String(base64Data || ''));
   if (!fileName || !bytes.length) throw new Error('File wajib diisi.');
   if (bytes.length > MAX_UPLOAD_BYTES) throw new Error('Ukuran file maksimal 8 MB.');
+  var isLogo = /^image\/(png|jpeg|webp)$/.test(mimeType) && /\.(png|jpe?g|webp)$/i.test(fileName);
+  var isWord = /\.(doc|docx)$/i.test(fileName) && [
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/octet-stream',
+    ''
+  ].indexOf(mimeType) !== -1;
+  if (entity === 'pengaturan' && !isLogo && !isWord) throw new Error('Aset pengaturan hanya menerima PNG/JPG/WebP atau DOC/DOCX.');
+  if (entity === 'pengaturan' && isLogo && bytes.length > 2 * 1024 * 1024) throw new Error('Ukuran logo maksimal 2 MB.');
   var file = ensureFolder_(DOC_FOLDER_NAME).createFile(Utilities.newBlob(bytes, mimeType || 'application/octet-stream', fileName));
+  var directUrl = '';
+  if (entity === 'pengaturan' && isLogo) {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    directUrl = 'https://drive.google.com/uc?export=view&id=' + encodeURIComponent(file.getId());
+  }
   appendAudit_(session, 'UPLOAD', entity, file.getId(), { name: file.getName(), size: file.getSize() });
-  return { id: file.getId(), name: file.getName(), url: file.getUrl(), mimeType: file.getMimeType(), size: file.getSize(), uploadedAt: new Date().toISOString() };
+  return { id: file.getId(), name: file.getName(), url: file.getUrl(), directUrl: directUrl, mimeType: file.getMimeType(), size: file.getSize(), uploadedAt: new Date().toISOString() };
 }
 
 function deleteFile_(session, entity, fileId) {
   requireAdministrator_(session);
+  if (String(entity || '') === 'pengaturan' && session.role !== 'Superadmin') throw new Error('Hanya Superadmin yang dapat menghapus aset pengaturan.');
   DriveApp.getFileById(fileId).setTrashed(true);
   appendAudit_(session, 'DELETE_FILE', entity, fileId, {});
   return true;

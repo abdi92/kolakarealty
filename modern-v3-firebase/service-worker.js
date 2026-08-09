@@ -1,4 +1,4 @@
-const CACHE_VERSION = "kbr-office-firebase-v4-2";
+const CACHE_VERSION = "kbr-office-firebase-v4-3";
 const APP_SHELL = [
   "./",
   "./index.html",

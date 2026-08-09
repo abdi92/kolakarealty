@@ -8,10 +8,11 @@ import {
   observeSession,
   saveRecord as saveFirestoreRecord,
 } from "./firebase-client.js";
+import * as mammoth from "mammoth";
 
 const { useState, useEffect, useRef, useDeferredValue } = React;
 
-const APP_VERSION = "4.1.0-settings-pwa";
+const APP_VERSION = "4.2.0-document-templates";
 
 class AppErrorBoundary extends React.Component {
   constructor(props) {
@@ -214,6 +215,7 @@ const DEFAULT_APP_SETTINGS = {
   templateSpk: "Dokumen ini dicetak dari modul Keuangan — SPK Borong Upah.",
   templateDetail: "Dokumen dicetak dari sistem administrasi perusahaan.",
   footerDokumen: "PT Kolaka Bumi Realty",
+  customSuratTemplates: [],
 };
 
 let ACTIVE_APP_SETTINGS = { ...DEFAULT_APP_SETTINGS };
@@ -1348,6 +1350,7 @@ const ENTITIES = [
         "Surat Tagihan Piutang",
         "Surat Lainnya",
       ] },
+      { key: "customTemplateId", label: "Template Upload (opsional)", type: "select", options: [""] },
       { key: "tanggalSurat", label: "Tanggal Surat", type: "date", required: true },
       { key: "ID_Pihak", label: "ID Pihak", type: "text", ref: ["pembeli.ID_Pihak", "pembeli.id", "pembeli.nama"] },
       { key: "namaPihak", label: "Nama Pihak", type: "text", required: true, ref: "pembeli.nama" },
@@ -2217,6 +2220,28 @@ function resolveRefOptions(ref, allData, context) {
   return Array.from(set).sort((a, b) => a.localeCompare(b, "id"));
 }
 
+function getCustomSuratTemplates(allData) {
+  const settings = allData && allData.pengaturan && allData.pengaturan[0];
+  const templates = settings && Array.isArray(settings.customSuratTemplates) ? settings.customSuratTemplates : [];
+  return templates.filter((template) => template && template.id && template.aktif !== false);
+}
+
+function getFieldOptions(schema, field, allData) {
+  if (schema.key === "generatesurat" && field.key === "customTemplateId") {
+    return ["", ...getCustomSuratTemplates(allData).map((template) => template.id)];
+  }
+  return field.options || [];
+}
+
+function getFieldOptionLabel(schema, field, value, allData) {
+  if (schema.key === "generatesurat" && field.key === "customTemplateId") {
+    if (!value) return "Gunakan template bawaan";
+    const template = getCustomSuratTemplates(allData).find((item) => item.id === value);
+    return template ? template.nama : value;
+  }
+  return value;
+}
+
 const MAX_ATTACHMENT_SIZE = 8 * 1024 * 1024; // 8MB - batas aman untuk request Apps Script
 /** Baca File jadi base64 (tanpa prefix data:mime;base64,) untuk dikirim ke backend. */
 function readFileAsBase64(file) {
@@ -2385,7 +2410,8 @@ function RecordFormModal({ schema, initial, allData, onCancel, onSubmit }) {
       if (f.secure) {
         v[f.key] = "";
       } else {
-        v[f.key] = initial ? (initial[f.key] ?? "") : (f.defaultValue ?? (f.type === "select" ? f.options[0] || "" : ""));
+        const options = getFieldOptions(schema, f, allData);
+        v[f.key] = initial ? (initial[f.key] ?? "") : (f.defaultValue ?? (f.type === "select" ? options[0] || "" : ""));
       }
     });
     v.lampiran = initial && Array.isArray(initial.lampiran) ? initial.lampiran : [];
@@ -2781,6 +2807,7 @@ function RecordFormModal({ schema, initial, allData, onCancel, onSubmit }) {
         </div>
         <div className="kbr-form-grid" style={{ padding: "18px 20px", overflowY: "auto" }}>
           {schema.fields.map((f) => {
+            const fieldOptions = getFieldOptions(schema, f, allData);
             const listId = f.ref ? `dl-${schema.key}-${f.key}` : undefined;
             const refOptions = f.ref ? resolveRefOptions(f.ref, allData, { values, schemaKey: schema.key, fieldKey: f.key }) : [];
             const isCurrencyField = schema.key === "budgetkonstruksi" && (f.key === "anggaran" || f.key === "realisasi");
@@ -2802,8 +2829,8 @@ function RecordFormModal({ schema, initial, allData, onCancel, onSubmit }) {
                 </span>
                 {f.type === "select" ? (
                   <select className="kbr-input" value={values[f.key]} onChange={(e) => setField(f.key, e.target.value)} style={inputStyle} disabled={isAuto}>
-                    {f.options.map((o) => (
-                      <option key={o} value={o}>{o}</option>
+                    {fieldOptions.map((o) => (
+                      <option key={o || "default"} value={o}>{getFieldOptionLabel(schema, f, o, allData)}</option>
                     ))}
                   </select>
                 ) : (
@@ -2964,6 +2991,7 @@ function buildGenerateSuratPrintHtml(record, dataAll) {
   const companyLine = escapeHtml(BRAND.companyLine || "");
   const companyShort = escapeHtml(BRAND.shortName || "Perusahaan");
   const tanggalHariIni = tanggalSurat;
+  const customTemplate = getCustomSuratTemplates(dataAll).find((template) => template.id === record.customTemplateId);
 
   const style = `
     @page { size: A4; margin: 18mm 18mm 20mm 18mm; }
@@ -3005,6 +3033,40 @@ function buildGenerateSuratPrintHtml(record, dataAll) {
     </div>
     <div class="footer-note">${escapeHtml(ACTIVE_APP_SETTINGS.templateSurat)}</div>
   `;
+
+  if (customTemplate) {
+    const placeholderValues = {
+      nomorSurat: record.nomorSurat,
+      jenisSurat: record.jenisSurat,
+      tanggalSurat: formatTanggal(record.tanggalSurat),
+      namaPihak: record.namaPihak,
+      ID_Pihak: record.ID_Pihak,
+      nomorUnit: record.nomorUnit,
+      ID_Unit: record.ID_Unit,
+      proyek: record.proyek,
+      perihal: record.perihal,
+      isiRingkas: record.isiRingkas,
+      penandatangan: record.penandatangan,
+      namaPerusahaan: BRAND.fullName,
+    };
+    const renderedText = String(customTemplate.isi || "").replace(/\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g, (match, key) => (
+      Object.prototype.hasOwnProperty.call(placeholderValues, key) ? String(placeholderValues[key] || "-") : match
+    ));
+    const safeBody = escapeHtml(renderedText).replace(/\r?\n/g, "<br>");
+    return `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>${nomorSurat} - ${escapeHtml(customTemplate.nama)}</title>
+  <style>${style}</style>
+</head>
+<body>
+  ${buildKopSuratHtml()}
+  <div class="isi" style="white-space:normal">${safeBody}</div>
+  ${baseSign}
+</body>
+</html>`;
+  }
 
   let bodySection = "";
 
@@ -5342,6 +5404,8 @@ function formatDateTime(isoStr) {
 function SettingsPage({ settings, onSave }) {
   const [values, setValues] = useState(() => ({ ...DEFAULT_APP_SETTINGS, ...(settings || {}) }));
   const [saving, setSaving] = useState(false);
+  const [assetUploading, setAssetUploading] = useState("");
+  const [assetError, setAssetError] = useState("");
   const [installReady, setInstallReady] = useState(() => !!window.__kbrInstallPrompt);
   const [installed, setInstalled] = useState(() => window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent || "");
@@ -5362,6 +5426,83 @@ function SettingsPage({ settings, onSave }) {
   }, []);
 
   const setField = (key, value) => setValues((current) => ({ ...current, [key]: value }));
+  const updateTemplate = (id, patch) => setValues((current) => ({
+    ...current,
+    customSuratTemplates: (current.customSuratTemplates || []).map((template) => template.id === id ? { ...template, ...patch } : template),
+  }));
+  const removeTemplate = (template) => {
+    if (!window.confirm(`Hapus template "${template.nama}"?`)) return;
+    setValues((current) => ({
+      ...current,
+      customSuratTemplates: (current.customSuratTemplates || []).filter((item) => item.id !== template.id),
+    }));
+    if (template.file && template.file.id) gsCall("deleteFile", "pengaturan", template.file.id).catch(() => {});
+  };
+  const uploadLogo = async (event) => {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setAssetError("Logo harus berformat PNG, JPG, atau WebP.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setAssetError("Ukuran logo maksimal 2 MB.");
+      return;
+    }
+    setAssetError("");
+    setAssetUploading("logo");
+    try {
+      const meta = await gsCall("uploadFile", "pengaturan", file.name, file.type, await readFileAsBase64(file));
+      const previous = values.logoFile;
+      setValues((current) => ({ ...current, logoUrl: meta.directUrl || meta.url, logoFile: meta }));
+      if (previous && previous.id) gsCall("deleteFile", "pengaturan", previous.id).catch(() => {});
+    } catch (error) {
+      setAssetError(error && error.message ? error.message : "Logo gagal diunggah.");
+    } finally {
+      setAssetUploading("");
+    }
+  };
+  const uploadTemplate = async (event) => {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!/\.(doc|docx)$/i.test(file.name)) {
+      setAssetError("Template harus berupa file .doc atau .docx.");
+      return;
+    }
+    if (file.size > MAX_ATTACHMENT_SIZE) {
+      setAssetError("Ukuran template maksimal 8 MB.");
+      return;
+    }
+    if ((values.customSuratTemplates || []).length >= 10) {
+      setAssetError("Maksimal 10 template surat aktif/tersimpan.");
+      return;
+    }
+    setAssetError("");
+    setAssetUploading("template");
+    try {
+      let extractedText = "";
+      if (/\.docx$/i.test(file.name)) {
+        const extracted = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+        extractedText = String(extracted.value || "").trim();
+      }
+      const meta = await gsCall("uploadFile", "pengaturan", file.name, file.type || "application/msword", await readFileAsBase64(file));
+      const baseName = file.name.replace(/\.(doc|docx)$/i, "");
+      const template = {
+        id: `tpl-${Date.now()}`,
+        nama: baseName,
+        aktif: true,
+        isi: extractedText || "Nomor: {{nomorSurat}}\nTanggal: {{tanggalSurat}}\nPerihal: {{perihal}}\n\nYth. {{namaPihak}}\n\n{{isiRingkas}}\n\nUnit {{nomorUnit}} - {{proyek}}",
+        file: meta,
+      };
+      setValues((current) => ({ ...current, customSuratTemplates: [...(current.customSuratTemplates || []), template] }));
+    } catch (error) {
+      setAssetError(error && error.message ? error.message : "Template gagal diunggah.");
+    } finally {
+      setAssetUploading("");
+    }
+  };
   const save = async (event) => {
     event.preventDefault();
     setSaving(true);
@@ -5418,8 +5559,49 @@ function SettingsPage({ settings, onSave }) {
         <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 14, padding: 14, background: "#F7F9FC", border: `1px solid ${C.border}`, borderRadius: 6 }}>
           <img src={values.logoUrl || DEFAULT_APP_SETTINGS.logoUrl} alt="Preview logo" style={{ width: 64, height: 64, objectFit: "contain", background: "#fff", border: `1px solid ${C.border}` }} />
           <div style={{ minWidth: 0 }}><div style={{ fontWeight: 800, color: values.warnaSidebar }}>{values.namaPerusahaan}</div><div style={{ fontSize: 12, color: C.muted }}>{values.tagline}</div></div>
-          <div style={{ marginLeft: "auto", width: 72, height: 32, background: values.warnaUtama, borderBottom: `5px solid ${values.warnaAksen}` }} title="Preview warna" />
+          <label style={{ ...ghostBtn, marginLeft: "auto", opacity: assetUploading === "logo" ? 0.6 : 1 }}>
+            <Upload size={14} /> {assetUploading === "logo" ? "Mengunggah..." : "Upload / Ganti Logo"}
+            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadLogo} disabled={!!assetUploading} style={{ display: "none" }} />
+          </label>
+          <div style={{ width: 72, height: 32, background: values.warnaUtama, borderBottom: `5px solid ${values.warnaAksen}` }} title="Preview warna" />
         </div>
+      </section>
+
+      <section style={cardBase}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: C.ink }}>Template Surat Word</div>
+            <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>Upload DOC/DOCX, edit isi, lalu pilih templatenya pada menu Generate Surat.</div>
+          </div>
+          <label style={{ ...primaryBtn, opacity: assetUploading === "template" ? 0.6 : 1 }}>
+            <Upload size={14} /> {assetUploading === "template" ? "Memproses..." : "Upload Template"}
+            <input type="file" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={uploadTemplate} disabled={!!assetUploading} style={{ display: "none" }} />
+          </label>
+        </div>
+        <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 12 }}>
+          Placeholder: {"{{nomorSurat}} · {{tanggalSurat}} · {{namaPihak}} · {{nomorUnit}} · {{proyek}} · {{perihal}} · {{isiRingkas}} · {{penandatangan}} · {{namaPerusahaan}}"}
+        </div>
+        {(values.customSuratTemplates || []).length === 0 ? (
+          <div style={{ padding: 18, textAlign: "center", color: C.mutedLight, border: `1px dashed ${C.border}` }}>Belum ada template Word.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {(values.customSuratTemplates || []).map((template) => (
+              <div key={template.id} style={{ border: `1px solid ${C.border}`, padding: 12, background: "#FAFCFF" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 1fr) auto auto", gap: 10, alignItems: "end" }}>
+                  <label><span style={fieldLabelStyle}>Nama Template</span><input value={template.nama || ""} maxLength={120} onChange={(event) => updateTemplate(template.id, { nama: event.target.value })} style={formInputStyle} /></label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 7, paddingBottom: 9, fontSize: 12.5 }}><input type="checkbox" checked={template.aktif !== false} onChange={(event) => updateTemplate(template.id, { aktif: event.target.checked })} /> Aktif</label>
+                  <button type="button" onClick={() => removeTemplate(template)} style={{ ...ghostBtn, color: C.red }} title="Hapus template"><Trash2 size={14} /> Hapus</button>
+                </div>
+                <textarea value={template.isi || ""} maxLength={30000} rows={9} onChange={(event) => updateTemplate(template.id, { isi: event.target.value })} style={{ ...formInputStyle, marginTop: 10, resize: "vertical", lineHeight: 1.55, fontFamily: "Georgia, serif" }} />
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 6, fontSize: 11, color: C.muted }}>
+                  <span>{template.file ? `${template.file.name} · ${formatFileSize(template.file.size)}` : "Tanpa file sumber"}</span>
+                  {template.file && <a href={template.file.url} target="_blank" rel="noreferrer" style={{ color: C.blue }}>Buka file asli</a>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {assetError && <div style={{ marginTop: 10, fontSize: 12, color: C.red }}>{assetError}</div>}
       </section>
 
       <section style={cardBase}>
