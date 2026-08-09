@@ -24,7 +24,7 @@ service cloud.firestore {
 
     function privilegedEntity(entity) {
       return entity in [
-        'pengguna', 'transaksi', 'booking', 'approval', 'kuitansi', 'voucher',
+        'pengguna', 'pengaturan', 'transaksi', 'booking', 'approval', 'kuitansi', 'voucher',
         'pettycash', 'bukubank', 'kartuanggaran', 'piutang', 'hutang',
         'budgetcontrol', 'kartupiutang', 'kartubarangmasuk', 'barangkeluar',
         'komisi', 'pph', 'bphtb', 'pengajuankpr', 'pencairankpr', 'spkborong',

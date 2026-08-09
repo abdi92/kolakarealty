@@ -26,4 +26,9 @@ assert.throws(() => derive("transaksi", { status: "Lunas" }), /tidak diizinkan/)
 assert.strictEqual(derive("transaksi", { status: "PPJB" }, { status: "Booking" }).status, "PPJB");
 assert.strictEqual(derive("tagihan", { jumlah: 100, jatuhTempo: "2026-08-01", status: "Belum Lunas" }).status, "Terlambat");
 
+const settings = derive("pengaturan", { id: "other", warnaUtama: "#2E6FB7", logoUrl: "https://cdn.example.com/logo.png" });
+assert.strictEqual(settings.id, "default");
+assert.throws(() => derive("pengaturan", { warnaUtama: "blue" }), /HEX/);
+assert.throws(() => derive("pengaturan", { logoUrl: "http://example.com/logo.png" }), /HTTPS/);
+
 console.log("Firebase Admin API business-rule tests passed.");

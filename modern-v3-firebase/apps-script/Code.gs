@@ -6,7 +6,7 @@ var DOC_FOLDER_NAME = 'KBR Firebase - Dokumen';
 var BACKUP_FOLDER_NAME = 'KBR Firebase - Backup';
 var MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 var PRIVILEGED_ENTITIES = [
-  'pengguna', 'transaksi', 'booking', 'approval', 'kuitansi', 'voucher', 'pettycash',
+  'pengguna', 'pengaturan', 'transaksi', 'booking', 'approval', 'kuitansi', 'voucher', 'pettycash',
   'bukubank', 'kartuanggaran', 'piutang', 'hutang', 'budgetcontrol', 'kartupiutang',
   'kartubarangmasuk', 'barangkeluar', 'komisi', 'pph', 'bphtb', 'pengajuankpr',
   'pencairankpr', 'spkborong', 'pricelist', 'targetmarketing', 'tagihan'
@@ -20,7 +20,7 @@ var ALL_ENTITIES = [
   'marketing', 'prospek', 'followup', 'targetmarketing', 'komisi', 'arsipdokumen',
   'pettycash', 'bukubank', 'voucher', 'kartuanggaran', 'piutang', 'hutang',
   'budgetcontrol', 'kartupiutang', 'kartubarangmasuk', 'spkborong', 'kuitansi',
-  'approval', 'supplier', 'masterbarang', 'barangkeluar', 'laporan'
+  'approval', 'supplier', 'masterbarang', 'barangkeluar', 'laporan', 'pengaturan'
 ];
 
 function jsonResponse_(payload) {
@@ -258,6 +258,24 @@ function percentage_(value, label, defaultValue) {
 
 function validateAndDerive_(entity, record, existing) {
   var result = JSON.parse(JSON.stringify(record || {}));
+  if (entity === 'pengaturan') {
+    var hexFields = ['warnaUtama', 'warnaSidebar', 'warnaAksen'];
+    hexFields.forEach(function (field) {
+      if (result[field] && !/^#[0-9a-fA-F]{6}$/.test(String(result[field]))) {
+        throw new Error(field + ' wajib menggunakan format warna HEX, contoh #2E6FB7.');
+      }
+    });
+    if (result.logoUrl && !/^https:\/\//i.test(String(result.logoUrl))) {
+      throw new Error('URL logo wajib menggunakan HTTPS.');
+    }
+    ['namaPerusahaan', 'namaSingkat', 'tagline', 'alamat', 'telepon', 'email', 'footerDokumen'].forEach(function (field) {
+      if (String(result[field] || '').length > 500) throw new Error(field + ' maksimal 500 karakter.');
+    });
+    ['templateSurat', 'templateKuitansi', 'templateSpk', 'templateDetail'].forEach(function (field) {
+      if (String(result[field] || '').length > 5000) throw new Error(field + ' maksimal 5.000 karakter.');
+    });
+    result.id = 'default';
+  }
   if (entity === 'approval') {
     var level1 = String(result.level1Status || 'Menunggu');
     var level2 = String(result.level2Status || 'Menunggu');
@@ -358,6 +376,9 @@ function saveRecord_(session, entity, record) {
   entity = String(entity || '').trim();
   if (PRIVILEGED_ENTITIES.indexOf(entity) === -1) throw new Error('Entity ini harus ditulis langsung melalui Firestore Rules.');
   if (!record || !record.id) throw new Error('record.id wajib diisi.');
+  if (entity === 'pengaturan' && session.role !== 'Superadmin') {
+    throw new Error('Hanya Superadmin yang dapat mengubah pengaturan aplikasi.');
+  }
   if (entity === 'pengguna') {
     if (session.role !== 'Superadmin') throw new Error('Hanya Superadmin yang dapat mengelola profil pengguna.');
     var existingProfile = getDocument_('users/' + encodeURIComponent(record.id));
@@ -391,7 +412,7 @@ function saveRecord_(session, entity, record) {
 function deleteRecord_(session, entity, id) {
   requireAdministrator_(session);
   if (PRIVILEGED_ENTITIES.indexOf(String(entity)) === -1) throw new Error('Entity ini harus dihapus langsung melalui Firestore Rules.');
-  if (entity === 'pengguna' && session.role !== 'Superadmin') throw new Error('Hanya Superadmin yang dapat mengelola pengguna.');
+  if ((entity === 'pengguna' || entity === 'pengaturan') && session.role !== 'Superadmin') throw new Error('Hanya Superadmin yang dapat mengelola data ini.');
   if (entity === 'pengguna') {
     deleteAuthUser_(id);
     deleteDocument_('users/' + encodeURIComponent(id));

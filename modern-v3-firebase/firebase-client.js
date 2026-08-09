@@ -36,11 +36,11 @@ const ENTITY_GROUPS = {
   voucher: "KEUANGAN", kartuanggaran: "KEUANGAN", piutang: "KEUANGAN", hutang: "KEUANGAN",
   budgetcontrol: "KEUANGAN", kartupiutang: "KEUANGAN", kartubarangmasuk: "KEUANGAN",
   spkborong: "KEUANGAN", kuitansi: "KEUANGAN", approval: "KEUANGAN", supplier: "GUDANG",
-  masterbarang: "GUDANG", barangkeluar: "GUDANG", laporan: null, pengguna: null,
+  masterbarang: "GUDANG", barangkeluar: "GUDANG", laporan: null, pengguna: null, pengaturan: null,
 };
 
 const PRIVILEGED_ENTITIES = new Set([
-  "pengguna", "transaksi", "booking", "approval", "kuitansi", "voucher", "pettycash", "bukubank",
+  "pengguna", "pengaturan", "transaksi", "booking", "approval", "kuitansi", "voucher", "pettycash", "bukubank",
   "kartuanggaran", "piutang", "hutang", "budgetcontrol", "kartupiutang", "kartubarangmasuk",
   "barangkeluar", "komisi", "pph", "bphtb", "pengajuankpr", "pencairankpr", "spkborong",
   "pricelist", "targetmarketing", "tagihan",

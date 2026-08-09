@@ -6,6 +6,12 @@
   <meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
   <meta content="PT Kolaka Bumi Realty" name="application-name"/>
   <meta content="Aplikasi manajemen administrasi PT Kolaka Bumi Realty" name="description"/>
+  <meta content="yes" name="mobile-web-app-capable"/>
+  <meta content="yes" name="apple-mobile-web-app-capable"/>
+  <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
+  <meta content="KBR Office" name="apple-mobile-web-app-title"/>
+  <meta content="#33475B" name="theme-color"/>
+  <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@main/modern-v3-firebase/blogger-manifest.webmanifest" rel="manifest"/>
   <link href="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@0be162b/modern-v3-firebase/logo-kolakabumirealty.png" rel="icon" type="image/png"/>
   <link href="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@0be162b/modern-v3-firebase/logo-kolakabumirealty.png" rel="apple-touch-icon"/>
   <title>PT Kolaka Bumi Realty</title>

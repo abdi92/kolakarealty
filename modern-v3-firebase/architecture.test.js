@@ -6,6 +6,7 @@ const client = read("firebase-client.js");
 const rules = read("firestore.rules");
 const blogger = read("blogger-template.xml");
 const bloggerConfig = read("blogger-runtime-config.js");
+const bloggerManifest = JSON.parse(read("blogger-manifest.webmanifest"));
 const adminApi = read("apps-script/Code.gs");
 const bundle = read("app.js");
 const appSource = read("app.jsx");
@@ -21,6 +22,7 @@ assert.doesNotMatch(blogger, /<script><!\[CDATA\[/i);
 assert.match(blogger, /cdn\.jsdelivr\.net\/gh\/abdi92\/kolakarealty@0be162b/);
 assert.match(blogger, /logo-kolakabumirealty\.png" rel="icon"/);
 assert.match(blogger, /logo-kolakabumirealty\.png" rel="apple-touch-icon"/);
+assert.match(blogger, /blogger-manifest\.webmanifest" rel="manifest"/);
 assert.ok(blogger.indexOf("blogger-runtime-config.js") < blogger.indexOf("modern-v3-firebase/app.js"));
 assert.match(bloggerConfig, /KBR_FIREBASE_CONFIG/);
 assert.match(bloggerConfig, /kolakarealty-fd4d7/);
@@ -29,10 +31,16 @@ assert.match(bloggerConfig, /KBR_ASSET_BASE_URL/);
 assert.match(adminApi, /accounts:lookup/);
 assert.match(adminApi, /requireAdministrator_/);
 assert.match(adminApi, /assertNoDoubleBooking_/);
+assert.match(adminApi, /Hanya Superadmin yang dapat mengubah pengaturan aplikasi/);
 assert.doesNotMatch(adminApi, /PRIVATE KEY/);
 assert.doesNotMatch(bundle, /AKfycbygpx_rYzPXJpDTVwBBN/);
 assert.match(bundle, /logo-kolakabumirealty\.png/);
 assert.doesNotMatch(appSource, /LOGO%20\(1\)\.png|LOGO \(1\)\.png/);
+assert.match(appSource, /function SettingsPage/);
+assert.match(appSource, /beforeinstallprompt/);
+assert.strictEqual(bloggerManifest.start_url, "https://kolakabumirealty.blogspot.com/");
+assert.strictEqual(bloggerManifest.display, "standalone");
+assert.ok(bloggerManifest.icons.some((icon) => icon.purpose === "maskable"));
 
 [
 	"buildGenerateSuratPrintHtml",
