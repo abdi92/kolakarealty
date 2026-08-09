@@ -15,12 +15,13 @@ assert.match(rules, /allow create, update, delete: if false;/);
 assert.match(rules, /request\.resource\.data\.id == recordId/);
 assert.match(rules, /match \/auditLogs\/\{logId\}/);
 assert.doesNotMatch(blogger, /<iframe/i);
-assert.match(blogger, /cdn\.jsdelivr\.net\/gh\/YOUR_GITHUB_USER/);
+assert.match(blogger, /cdn\.jsdelivr\.net\/gh\/abdi92\/kolakarealty@main/);
 assert.match(adminApi, /accounts:lookup/);
 assert.match(adminApi, /requireAdministrator_/);
 assert.match(adminApi, /assertNoDoubleBooking_/);
 assert.doesNotMatch(adminApi, /PRIVATE KEY/);
 assert.doesNotMatch(bundle, /AKfycbygpx_rYzPXJpDTVwBBN/);
+assert.match(bundle, /logo-kolakabumirealty\.png/);
 
 JSON.parse(read("firebase.json"));
 JSON.parse(read("firestore.indexes.json"));

@@ -22,7 +22,7 @@ modern-v3/
 |-- service-worker.js
 |-- offline.html
 |-- icons/
-|-- LOGO (1).png
+|-- logo-kolakabumirealty.png
 |-- bachground.png
 `-- MODERNIZATION_REPORT.md
 ```

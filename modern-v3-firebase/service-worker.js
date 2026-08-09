@@ -5,7 +5,7 @@ const APP_SHELL = [
   "./app.js",
   "./manifest.webmanifest",
   "./offline.html",
-  "./LOGO%20(1).png",
+  "./logo-kolakabumirealty.png",
   "./bachground.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
