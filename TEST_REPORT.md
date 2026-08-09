@@ -30,6 +30,11 @@ Migrasi transport dan static frontend telah diuji lokal. Deployment Google Apps 
 | Apps Script | GET `/exec` mengembalikan health JSON `success: true` | Lulus |
 | Apps Script | POST `text/plain` untuk action aman `logout` mengembalikan envelope sukses | Lulus |
 | GitHub Pages | Build dari `main:/` berstatus `built` dan login dirender dari URL produksi | Lulus |
+| PWA | Manifest valid dengan mode `standalone`, scope relatif, dan tiga ikon | Lulus |
+| PWA | Service worker aktif, mengontrol halaman, dan menyimpan tujuh resource shell | Lulus |
+| PWA | Ikon PNG 192x192, 512x512, dan maskable 512x512 valid | Lulus |
+| PWA | Fallback navigasi offline tersedia tanpa menyimpan response API | Lulus |
+| Mobile | PWA pada viewport 390 x 844 tidak mengalami horizontal overflow | Lulus |
 
 ## Menunggu Deployment
 
@@ -44,7 +49,7 @@ Migrasi transport dan static frontend telah diuji lokal. Deployment Google Apps 
 | Laporan keuangan | Memerlukan data Sheets nyata |
 | Trigger reminder | Memerlukan project Apps Script dan otorisasi MailApp |
 | Browser lintas Chrome/Edge/Firefox/Safari perangkat nyata | Workspace hanya menyediakan browser pengujian terintegrasi |
-| GitHub Pages production | Memerlukan repository/akun GitHub dan Git CLI atau upload melalui web |
+| Instalasi PWA pada perangkat fisik | Memerlukan Chrome Android atau Safari iOS milik pengguna |
 
 ## Uji Penerimaan Setelah Deployment
 
@@ -62,5 +67,5 @@ Migrasi transport dan static frontend telah diuji lokal. Deployment Google Apps 
 
 - `python.exe` di mesin ini adalah Windows Store alias, bukan runtime Python aktif.
 - PowerShell melarang wrapper `npx.ps1`; pengujian tidak bergantung pada perubahan execution policy.
-- Git CLI tidak tersedia, sehingga repository lokal dan push remote belum dapat dibuat dari terminal ini.
-- Static browser test dijalankan menggunakan server sementara dari modul bawaan Node.js; Node.js tidak menjadi bagian aplikasi atau arsitektur deployment.
+- Portable Git CLI tersedia di direktori tools lokal dan repository terhubung ke GitHub.
+- Static browser test dijalankan menggunakan server sementara Node.js; Node.js tidak menjadi bagian aplikasi atau arsitektur deployment.

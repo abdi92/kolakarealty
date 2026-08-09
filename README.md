@@ -19,6 +19,10 @@ Tidak ada Node.js backend, server tambahan, atau database lain.
 ```text
 .
 |-- index.html            # Frontend React statis dan entry point GitHub Pages
+|-- manifest.webmanifest # Metadata instalasi PWA
+|-- service-worker.js    # Cache aplikasi dan fallback offline
+|-- offline.html         # Halaman saat koneksi terputus
+|-- icons/               # Ikon Android, iOS, dan maskable
 |-- Code.gs               # Backend Apps Script Web App
 |-- README.md             # Panduan ini
 |-- REBUILD_ANALYSIS.md   # Analisis migrasi dan pemetaan API
@@ -35,6 +39,7 @@ Tidak ada Node.js backend, server tambahan, atau database lain.
 - Upload dokumen Drive, impor/ekspor CSV, pencetakan dokumen, dan arsip.
 - Audit log, backup/restore, laporan keuangan, anti-double-booking, dan reminder pembayaran.
 - Tampilan responsif desktop, tablet, Android, dan iPhone.
+- PWA yang dapat dipasang ke layar utama HP.
 
 ## Persiapan Google Sheets
 
@@ -96,6 +101,22 @@ Frontend mengirim request sederhana `POST` dengan `Content-Type: text/plain;char
 
 GitHub Pages memuat `index.html` langsung dari root repository. Semua asset eksternal memakai HTTPS.
 
+## Instalasi di HP
+
+### Android (Chrome)
+
+1. Buka URL GitHub Pages aplikasi melalui Chrome.
+2. Ketuk menu tiga titik, lalu pilih **Instal aplikasi** atau **Tambahkan ke layar utama**.
+3. Konfirmasi **Instal**. Aplikasi akan muncul di layar utama dan daftar aplikasi.
+
+### iPhone/iPad (Safari)
+
+1. Buka URL GitHub Pages aplikasi melalui Safari.
+2. Ketuk tombol **Bagikan**.
+3. Pilih **Tambahkan ke Layar Utama**, lalu ketuk **Tambah**.
+
+PWA tetap memerlukan internet untuk login dan mengakses data Apps Script. Saat perangkat offline, aplikasi menampilkan halaman koneksi terputus dan tidak menggunakan data kantor yang mungkin sudah kedaluwarsa.
+
 ## Development Lokal
 
 Jangan menguji melalui `file:///`. Jalankan static server dari folder project, misalnya ekstensi VS Code **Live Server**, lalu buka URL yang diberikan ekstensi. Alternatif bila Python tersedia:
@@ -155,6 +176,7 @@ Jangan melakukan pengujian create/update/delete pada data produksi yang tidak bo
 ## Update Aplikasi
 
 - Perubahan frontend: edit `index.html`, push ke branch Pages, lalu tunggu deployment GitHub Pages selesai.
+- Perubahan file PWA: naikkan `CACHE_VERSION` pada `service-worker.js` agar perangkat mengambil cache terbaru.
 - Perubahan backend: edit `Code.gs`, buat versi deployment Apps Script baru, lalu uji health check dan login.
 - Perubahan schema form tidak otomatis mengubah header Sheet karena record disimpan sebagai JSON pada kolom `value`.
 
