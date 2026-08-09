@@ -1,4 +1,4 @@
-const CACHE_VERSION = "kbr-office-v4";
+const CACHE_VERSION = "kbr-office-v5";
 const APP_SHELL = [
   "./",
   "./index.html",
