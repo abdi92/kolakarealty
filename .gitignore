@@ -1,0 +1,9 @@
+hosting-ready/api/config.local.php
+hosting-ready/storage/*
+!hosting-ready/storage/.htaccess
+hosting-ready/uploads/*
+!hosting-ready/uploads/.htaccess
+xampp-local/storage/*
+!xampp-local/storage/.htaccess
+xampp-local/uploads/*
+!xampp-local/uploads/.htaccess

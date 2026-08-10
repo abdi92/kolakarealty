@@ -1,0 +1,16 @@
+{
+  "name": "kbr-office-modern-v3",
+  "version": "3.0.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild app.jsx --outfile=app.js --bundle --format=iife --platform=browser --target=es2020 --minify",
+    "check": "node --check app.js && node formula.test.js && node architecture.test.js"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.8"
+  },
+  "dependencies": {
+    "docxtemplater": "^3.69.3",
+    "pizzip": "^3.2.0"
+  }
+}
