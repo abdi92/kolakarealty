@@ -19,7 +19,7 @@ assert.match(rules, /request\.resource\.data\.id == recordId/);
 assert.match(rules, /match \/auditLogs\/\{logId\}/);
 assert.doesNotMatch(blogger, /<iframe/i);
 assert.doesNotMatch(blogger, /<script><!\[CDATA\[/i);
-assert.match(blogger, /cdn\.jsdelivr\.net\/gh\/abdi92\/kolakarealty@1dc1077\/modern-v3-firebase\/app\.js/);
+assert.match(blogger, /cdn\.jsdelivr\.net\/gh\/abdi92\/kolakarealty@a866eb1\/modern-v3-firebase\/app\.js/);
 assert.match(blogger, /logo-kolakabumirealty\.png" rel="icon"/);
 assert.match(blogger, /logo-kolakabumirealty\.png" rel="apple-touch-icon"/);
 assert.match(blogger, /blogger-manifest\.webmanifest" rel="manifest"/);
