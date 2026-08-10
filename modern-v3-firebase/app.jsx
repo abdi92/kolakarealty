@@ -3039,6 +3039,16 @@ function buildGenerateSuratPrintHtml(record, dataAll) {
       ID_Unit: record.ID_Unit,
       proyek: record.proyek,
       perihal: record.perihal,
+      periodeTagihan: record.periodeTagihan,
+      nominalTagihan: formatRupiah(record.nominalTagihan || 0),
+      tanggalJatuhTempo: formatTanggal(record.tanggalJatuhTempo),
+      pemberitahuanKe: record.pemberitahuanKe,
+      kotaSurat: record.kotaSurat,
+      nomorSPPR: record.nomorSPPR,
+      tanggalSPPR: formatTanggal(record.tanggalSPPR),
+      nomorSPJB: record.nomorSPJB,
+      tanggalSPJB: formatTanggal(record.tanggalSPJB),
+      blokUnit: record.blokUnit,
       isiRingkas: record.isiRingkas,
       penandatangan: record.penandatangan,
       namaPerusahaan: BRAND.fullName,
@@ -5573,7 +5583,8 @@ function SettingsPage({ settings, onSave }) {
           </label>
         </div>
         <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 12 }}>
-          Placeholder: {"{{nomorSurat}} · {{tanggalSurat}} · {{namaPihak}} · {{nomorUnit}} · {{proyek}} · {{perihal}} · {{isiRingkas}} · {{penandatangan}} · {{namaPerusahaan}}"}
+          Placeholder utama: {"{{nomorSurat}} · {{jenisSurat}} · {{tanggalSurat}} · {{namaPihak}} · {{nomorUnit}} · {{proyek}} · {{perihal}} · {{isiRingkas}} · {{penandatangan}} · {{namaPerusahaan}}"}
+          <br />Placeholder khusus: {"{{periodeTagihan}} · {{nominalTagihan}} · {{tanggalJatuhTempo}} · {{pemberitahuanKe}} · {{kotaSurat}} · {{nomorSPPR}} · {{tanggalSPPR}} · {{nomorSPJB}} · {{tanggalSPJB}} · {{blokUnit}} · {{ID_Pihak}} · {{ID_Unit}}"}
         </div>
         {(values.customSuratTemplates || []).length === 0 ? (
           <div style={{ padding: 18, textAlign: "center", color: C.mutedLight, border: `1px dashed ${C.border}` }}>Belum ada template Word.</div>

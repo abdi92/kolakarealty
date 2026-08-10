@@ -5,8 +5,52 @@ const mammoth = require("mammoth");
 
 const root = path.resolve(__dirname, "..");
 const outputDirectory = path.join(root, "templates");
-const outputPath = path.join(outputDirectory, "Template-Surat-KBR-Custom.docx");
 const logoPath = path.join(root, "logo-kolakabumirealty.png");
+
+const templateDefinitions = [
+  {
+    fileName: "Template-Draft-SPK-Rumah-Subsidi.docx",
+    title: "DRAFT SPK RUMAH SUBSIDI",
+    opening: "Pada tanggal {{tanggalSurat}}, PT Kolaka Bumi Realty dan {{namaPihak}} menerangkan kesepakatan pekerjaan untuk unit {{nomorUnit}} pada proyek {{proyek}}.",
+    body: "Ruang lingkup, nilai pekerjaan, jangka waktu, hak, kewajiban, dan ketentuan lain dapat ditulis atau disesuaikan pada bagian ini. {{isiRingkas}}",
+    closing: "Surat perjanjian kerja ini dibuat untuk dipatuhi dan dilaksanakan oleh para pihak dengan penuh tanggung jawab.",
+  },
+  {
+    fileName: "Template-Form-SPPR-Royal-Paradise.docx",
+    title: "FORM SPPR ROYAL PARADISE",
+    opening: "Nomor SPPR: {{nomorSPPR}}\nTanggal SPPR: {{tanggalSPPR}}\nNama Pemohon: {{namaPihak}}\nUnit: {{blokUnit}} / {{nomorUnit}}\nProyek: {{proyek}}",
+    body: "Dengan ini pemohon mengajukan pemesanan unit tersebut sesuai data, harga, cara pembayaran, dan persyaratan yang disepakati. {{isiRingkas}}",
+    closing: "Formulir ini menjadi dasar pemrosesan pemesanan dan dokumen lanjutan setelah diverifikasi oleh perusahaan.",
+  },
+  {
+    fileName: "Template-SPJB-RPD.docx",
+    title: "SURAT PERJANJIAN JUAL BELI (SPJB RPD)",
+    opening: "Nomor SPJB: {{nomorSPJB}}\nTanggal SPJB: {{tanggalSPJB}}\nPihak Pembeli: {{namaPihak}}\nUnit: {{blokUnit}} / {{nomorUnit}}\nProyek: {{proyek}}",
+    body: "Para pihak sepakat mengikatkan diri dalam jual beli unit tersebut berdasarkan harga, pembayaran, serah terima, dan ketentuan yang disepakati. {{isiRingkas}}",
+    closing: "SPJB ini dibuat dengan itikad baik dan berlaku sejak ditandatangani oleh para pihak.",
+  },
+  {
+    fileName: "Template-Surat-Perjanjian-Jual-Beli.docx",
+    title: "SURAT PERJANJIAN JUAL BELI",
+    opening: "Pada tanggal {{tanggalSurat}}, PT Kolaka Bumi Realty selaku pihak penjual dan {{namaPihak}} selaku pihak pembeli sepakat melakukan jual beli unit {{nomorUnit}} pada proyek {{proyek}}.",
+    body: "Objek perjanjian, nilai transaksi, tata cara pembayaran, penyerahan, wanprestasi, dan penyelesaian perselisihan dapat disesuaikan pada bagian ini. {{isiRingkas}}",
+    closing: "Perjanjian ini dibuat dalam keadaan sadar, tanpa paksaan, dan untuk dilaksanakan oleh kedua belah pihak.",
+  },
+  {
+    fileName: "Template-Surat-Tagihan-Piutang.docx",
+    title: "SURAT TAGIHAN PIUTANG",
+    opening: "Pemberitahuan ke-{{pemberitahuanKe}}\nPeriode tagihan: {{periodeTagihan}}\nNilai tagihan: {{nominalTagihan}}\nJatuh tempo: {{tanggalJatuhTempo}}",
+    body: "Kepada {{namaPihak}}, berdasarkan catatan administrasi kami masih terdapat kewajiban pembayaran atas unit {{nomorUnit}} di {{proyek}}. Mohon pembayaran diselesaikan paling lambat pada tanggal jatuh tempo tersebut. {{isiRingkas}}",
+    closing: "Apabila pembayaran telah dilakukan, mohon mengabaikan surat ini dan menyampaikan bukti pembayaran kepada bagian administrasi.",
+  },
+  {
+    fileName: "Template-Surat-Lainnya.docx",
+    title: "{{jenisSurat}}",
+    opening: "Kepada Yth.\nBapak/Ibu/Saudara {{namaPihak}}\nPemilik/Pemesan Unit {{nomorUnit}} - {{proyek}}\nDi tempat",
+    body: "Dengan hormat,\n\n{{isiRingkas}}",
+    closing: "Demikian surat ini kami sampaikan. Atas perhatian dan kerja samanya, kami mengucapkan terima kasih.",
+  },
+];
 
 const xml = (value) => String(value)
   .replace(/&/g, "&amp;")
@@ -71,32 +115,41 @@ const headerTable = `
     </w:tr>
   </w:tbl>`;
 
-const documentBody = [
+function bodyParagraphs(text) {
+  return String(text).split("\n").map((line) => paragraph(run(line || " ", { size: 24, font: "Times New Roman" }), {
+    align: line ? "both" : "left",
+    firstLine: line ? 720 : 0,
+    after: line ? 120 : 40,
+    line: 360,
+  })).join("");
+}
+
+function buildDocumentBody(definition) {
+  return [
   headerTable,
-  paragraph(run("{{jenisSurat}}", { bold: true, underline: true, size: 28, font: "Times New Roman" }), { align: "center", before: 180, after: 30, line: 300 }),
+  paragraph(run(definition.title, { bold: true, underline: true, size: 28, font: "Times New Roman" }), { align: "center", before: 180, after: 30, line: 300 }),
   paragraph(run("Nomor: {{nomorSurat}}", { size: 22, font: "Times New Roman" }), { align: "center", after: 220, line: 280 }),
-  paragraph(run("Kolaka, {{tanggalSurat}}", { size: 24, font: "Times New Roman" }), { align: "right", after: 160 }),
+  paragraph(run("{{kotaSurat}}, {{tanggalSurat}}", { size: 24, font: "Times New Roman" }), { align: "right", after: 160 }),
   `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/></w:tblPr><w:tblGrid><w:gridCol w:w="1200"/><w:gridCol w:w="200"/><w:gridCol w:w="7950"/></w:tblGrid><w:tr>${tableCell(paragraph(run("Perihal", { size: 24 }), { after: 40 }), 1200)}${tableCell(paragraph(run(":"), { after: 40 }), 200)}${tableCell(paragraph(run("{{perihal}}", { bold: true, size: 24 }), { after: 40 }), 7950)}</w:tr></w:tbl>`,
-  paragraph(run("Kepada Yth.", { size: 24 }), { before: 160, after: 20 }),
-  paragraph(run("Bapak/Ibu/Saudara {{namaPihak}}", { bold: true, size: 24 }), { after: 20 }),
-  paragraph(run("Pemilik/Pemesan Unit {{nomorUnit}} - {{proyek}}", { size: 24 }), { after: 20 }),
-  paragraph(run("Di tempat", { size: 24 }), { after: 220 }),
-  paragraph(run("Dengan hormat,", { size: 24 }), { after: 120 }),
-  paragraph(run("{{isiRingkas}}", { size: 24, font: "Times New Roman" }), { align: "both", firstLine: 720, after: 180, line: 360 }),
-  paragraph(run("Demikian surat ini kami sampaikan. Atas perhatian dan kerja samanya, kami mengucapkan terima kasih.", { size: 24, font: "Times New Roman" }), { align: "both", firstLine: 720, after: 280, line: 360 }),
+  bodyParagraphs(definition.opening),
+  bodyParagraphs(definition.body),
+  bodyParagraphs(definition.closing),
   `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/></w:tblPr><w:tblGrid><w:gridCol w:w="4700"/><w:gridCol w:w="4650"/></w:tblGrid><w:tr>${tableCell(paragraph(run("", { size: 24 }), { after: 0 }), 4700)}${tableCell([
     paragraph(run("Hormat kami,", { size: 24 }), { align: "center", after: 20 }),
     paragraph(run("{{namaPerusahaan}}", { bold: true, size: 24 }), { align: "center", after: 900 }),
     paragraph(run("{{penandatangan}}", { bold: true, underline: true, size: 24 }), { align: "center", after: 20 }),
     paragraph(run("Penandatangan", { size: 22 }), { align: "center", after: 0 }),
   ].join(""), 4650)}</w:tr></w:tbl>`,
-  paragraph(run("Placeholder tambahan yang tersedia: ID Pihak {{ID_Pihak}} | ID Unit {{ID_Unit}}", { italic: true, size: 16, font: "Times New Roman" }), { before: 360, after: 0, align: "center", line: 220 }),
-].join("");
+  paragraph(run("Referensi data: ID Pihak {{ID_Pihak}} | ID Unit {{ID_Unit}}", { italic: true, size: 16, font: "Times New Roman" }), { before: 360, after: 0, align: "center", line: 220 }),
+  ].join("");
+}
 
-const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+function buildDocumentXml(definition) {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
-  <w:body>${documentBody}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708"/><w:cols w:space="708"/><w:docGrid w:linePitch="360"/></w:sectPr></w:body>
+  <w:body>${buildDocumentBody(definition)}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708"/><w:cols w:space="708"/><w:docGrid w:linePitch="360"/></w:sectPr></w:body>
 </w:document>`;
+}
 
 const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
@@ -105,17 +158,19 @@ const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 </w:styles>`;
 
 async function main() {
-  const zip = new JSZip();
+  fs.mkdirSync(outputDirectory, { recursive: true });
+  for (const definition of templateDefinitions) {
+    const outputPath = path.join(outputDirectory, definition.fileName);
+    const zip = new JSZip();
   zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`);
   zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`);
-  zip.file("word/document.xml", documentXml);
+  zip.file("word/document.xml", buildDocumentXml(definition));
   zip.file("word/styles.xml", stylesXml);
   zip.file("word/_rels/document.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo.png"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
   zip.file("word/media/logo.png", fs.readFileSync(logoPath));
   zip.file("docProps/core.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Template Surat KBR Custom</dc:title><dc:creator>PT Kolaka Bumi Realty</dc:creator><dc:subject>Template Generate Surat</dc:subject><dcterms:created xsi:type="dcterms:W3CDTF">2026-08-10T00:00:00Z</dcterms:created></cp:coreProperties>`);
   zip.file("docProps/app.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Microsoft Office Word</Application><Company>PT Kolaka Bumi Realty</Company></Properties>`);
 
-  fs.mkdirSync(outputDirectory, { recursive: true });
   fs.writeFileSync(outputPath, await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
   const generated = await JSZip.loadAsync(fs.readFileSync(outputPath));
   ["[Content_Types].xml", "word/document.xml", "word/styles.xml", "word/media/logo.png"].forEach((entry) => {
@@ -127,6 +182,7 @@ async function main() {
   });
   console.log(`DOCX valid: ${outputPath}`);
   console.log(`Ukuran: ${fs.statSync(outputPath).size} byte | Placeholder: lengkap`);
+  }
 }
 
 main().catch((error) => {
