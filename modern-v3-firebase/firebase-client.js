@@ -32,7 +32,7 @@ const ENTITY_GROUPS = {
   transaksi: "PENJUALAN", jualicicilan: "PENJUALAN", pengajuankpr: "PENJUALAN",
   jadwalcicilan: "PENJUALAN", unitpihak: "PENJUALAN", tagihan: "PENJUALAN",
   marketing: "MARKETING", prospek: "MARKETING", followup: "MARKETING", targetmarketing: "MARKETING",
-  komisi: "MARKETING", arsipdokumen: "LEGAL", pettycash: "KEUANGAN", bukubank: "KEUANGAN",
+  komisi: "MARKETING", arsipdokumen: "LEGAL", generatesurat: "LEGAL", pettycash: "KEUANGAN", bukubank: "KEUANGAN",
   voucher: "KEUANGAN", kartuanggaran: "KEUANGAN", piutang: "KEUANGAN", hutang: "KEUANGAN",
   budgetcontrol: "KEUANGAN", kartupiutang: "KEUANGAN", kartubarangmasuk: "KEUANGAN",
   spkborong: "KEUANGAN", kuitansi: "KEUANGAN", approval: "KEUANGAN", supplier: "GUDANG",

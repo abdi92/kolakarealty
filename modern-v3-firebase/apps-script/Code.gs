@@ -20,7 +20,8 @@ var ALL_ENTITIES = [
   'marketing', 'prospek', 'followup', 'targetmarketing', 'komisi', 'arsipdokumen',
   'pettycash', 'bukubank', 'voucher', 'kartuanggaran', 'piutang', 'hutang',
   'budgetcontrol', 'kartupiutang', 'kartubarangmasuk', 'spkborong', 'kuitansi',
-  'approval', 'supplier', 'masterbarang', 'barangkeluar', 'laporan', 'pengaturan'
+  'approval', 'supplier', 'masterbarang', 'barangkeluar', 'arsipdokumen', 'generatesurat',
+  'laporan', 'pengaturan'
 ];
 
 function jsonResponse_(payload) {
@@ -53,6 +54,7 @@ function routeAction_(session, action, args) {
     case 'listAuditLog': return listAuditLog_(session, args[0]);
     case 'backupData': return backupData_(session);
     case 'listBackups': return listBackups_(session);
+    case 'restoreBackup': return restoreBackup_(session, args[0]);
     case 'searchAll': return searchAll_(session, args[0]);
     case 'getFinanceSummary': return getFinanceSummary_(session, args[0]);
     case 'resetUserPassword': return resetUserPassword_(session, args[0], args[1]);
@@ -515,6 +517,70 @@ function listBackups_(session) {
     result.push({ id: file.getId(), name: file.getName(), url: file.getUrl(), size: file.getSize(), createdAt: file.getDateCreated().toISOString() });
   }
   return result.sort(function (a, b) { return b.createdAt.localeCompare(a.createdAt); });
+}
+
+function restoreBackup_(session, fileId) {
+  if (session.role !== 'Superadmin') throw new Error('Hanya Superadmin yang dapat memulihkan backup.');
+  var id = String(fileId || '').trim();
+  if (!id) throw new Error('File backup wajib dipilih.');
+
+  var file = DriveApp.getFileById(id);
+  var backupFolder = ensureFolder_(BACKUP_FOLDER_NAME);
+  var parentFolders = file.getParents();
+  var belongsToBackupFolder = false;
+  while (parentFolders.hasNext()) {
+    if (parentFolders.next().getId() === backupFolder.getId()) {
+      belongsToBackupFolder = true;
+      break;
+    }
+  }
+  if (!belongsToBackupFolder) throw new Error('File bukan bagian dari folder backup KBR.');
+
+  var snapshot;
+  try {
+    snapshot = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  } catch (error) {
+    throw new Error('File backup tidak valid atau rusak.');
+  }
+  if (!snapshot || !Array.isArray(snapshot.users) || !snapshot.entities || typeof snapshot.entities !== 'object') {
+    throw new Error('Format file backup tidak dikenali.');
+  }
+
+  var snapshotUserIds = {};
+  snapshot.users.forEach(function (user) {
+    if (user && user.id) snapshotUserIds[String(user.id)] = true;
+  });
+  listCollection_('users').forEach(function (user) {
+    if (user && user.id && !snapshotUserIds[String(user.id)]) {
+      deleteDocument_('users/' + encodeURIComponent(user.id));
+    }
+  });
+  snapshot.users.forEach(function (user) {
+    if (!user || !user.id) return;
+    var cleanUser = JSON.parse(JSON.stringify(user));
+    delete cleanUser.password;
+    delete cleanUser.passwordHash;
+    delete cleanUser.pin;
+    delete cleanUser.pinHash;
+    setDocument_('users/' + encodeURIComponent(cleanUser.id), cleanUser);
+  });
+  ALL_ENTITIES.forEach(function (entity) {
+    var records = Array.isArray(snapshot.entities[entity]) ? snapshot.entities[entity] : [];
+    var snapshotRecordIds = {};
+    records.forEach(function (record) {
+      if (record && record.id) snapshotRecordIds[String(record.id)] = true;
+    });
+    listCollection_('entities/' + encodeURIComponent(entity) + '/records').forEach(function (record) {
+      if (record && record.id && !snapshotRecordIds[String(record.id)]) {
+        deleteDocument_(recordPath_(entity, record.id));
+      }
+    });
+    records.forEach(function (record) {
+      if (record && record.id) setDocument_(recordPath_(entity, record.id), record);
+    });
+  });
+  appendAudit_(session, 'RESTORE_BACKUP', 'system', id, { name: file.getName() });
+  return { restored: true, fileId: id, fileName: file.getName() };
 }
 
 function searchAll_(session, query) {

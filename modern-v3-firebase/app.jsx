@@ -244,12 +244,6 @@ function applyAppSettings(record) {
   SIDE.bg = ACTIVE_APP_SETTINGS.warnaSidebar;
   SIDE.brandBg = ACTIVE_APP_SETTINGS.warnaSidebar;
   SIDE.activeBg = ACTIVE_APP_SETTINGS.warnaUtama;
-  if (typeof KOP_SURAT_INFO !== "undefined") {
-    KOP_SURAT_INFO.tagline = ACTIVE_APP_SETTINGS.tagline;
-    KOP_SURAT_INFO.alamat = `${ACTIVE_APP_SETTINGS.alamat} · ${ACTIVE_APP_SETTINGS.telepon}`;
-    KOP_SURAT_INFO.email = `Email : ${ACTIVE_APP_SETTINGS.email}`;
-    KOP_SURAT_INFO.emailSingkat = `Email : ${ACTIVE_APP_SETTINGS.email}`;
-  }
 }
 
 if (typeof window !== "undefined") {
@@ -309,11 +303,11 @@ function KopSuratPrint() {
   return (
     <div className="kbr-kop-print" style={{ display: "none" }}>
       <div style={{ display: "flex", alignItems: "center", borderBottom: "3px double #000", paddingBottom: 8, marginBottom: 14, color: "#000", fontFamily: "'Times New Roman', Times, serif" }}>
-        {BRAND.logoSrc ? <img src={BRAND.logoSrc} alt="Logo" style={{ width: 78, height: 78, objectFit: "contain", marginRight: 14 }} /> : null}
-        <div style={{ flex: 1, textAlign: "center" }}>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: 1 }}>{BRAND.fullName}</div>
+        {BRAND.logoSrc ? <img src={BRAND.logoSrc} alt="Logo" style={{ width: 78, height: 78, objectFit: "contain", marginRight: 14, padding: 4, background: "#fff" }} /> : null}
+        <div style={{ flex: 1, textAlign: "left" }}>
+          <div style={{ fontSize: 22, fontWeight: 700 }}>PT Kolaka Bumi Realty</div>
           <div style={{ fontStyle: "italic", fontSize: 11, marginTop: 2 }}>Developer &amp; Contraktor</div>
-          <div style={{ fontSize: 10.5, marginTop: 3 }}>Office : Jl. Repelita No. 54 &nbsp; Telp (0405) 2321613 &nbsp; HP 0852 4197 4777</div>
+          <div style={{ fontSize: 10.5, marginTop: 3 }}>Office : Jl. Repelita No. 54 · Telp (0405) 2321613 · HP 0852 4197 4777</div>
           <div style={{ fontSize: 10.5, marginTop: 2 }}>Email : kolakakbr@gmail.com</div>
         </div>
       </div>
@@ -2375,14 +2369,14 @@ function LoadingState({ label = "Memuat data...", variant = "card", rows = 4 }) 
     </div>
   );
 }
-function ErrorState({ onRetry }) {
+function ErrorState({ onRetry, message }) {
   return (
     <div style={{ ...cardBase, alignItems: "center", textAlign: "center", padding: "60px 24px", gap: 12 }}>
       <div style={{ width: 52, height: 52, borderRadius: 14, background: palette.red.bg, color: palette.red.fg, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <AlertTriangle size={24} />
       </div>
       <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>Gagal memuat data</div>
-      <div style={{ fontSize: 13, color: C.muted, maxWidth: 360 }}>Periksa koneksi internet, lalu coba lagi. Jika terus gagal, pastikan deployment web app masih aktif.</div>
+      <div style={{ fontSize: 13, color: C.muted, maxWidth: 420 }}>{message || "Periksa koneksi internet, lalu coba lagi. Jika terus gagal, pastikan deployment web app masih aktif."}</div>
       <button onClick={onRetry} style={{ ...primaryBtn, marginTop: 4 }}>
         <RefreshCw size={14} /> Coba Lagi
       </button>
@@ -2924,7 +2918,7 @@ function escapeHtml(value) {
 // ---------- Kop surat resmi PT Kolaka Bumi Realty (dipakai di semua fitur cetak) ----------
 const KOP_SURAT_INFO = {
   tagline: "Developer & Contraktor",
-  alamat: "Office : Jl. Repelita No. 54 &nbsp; Telp (0405) 2321613 &nbsp; HP 0852 4197 4777",
+  alamat: "Office : Jl. Repelita No. 54 · Telp (0405) 2321613 · HP 0852 4197 4777",
   email: "Email : kolakakbr@gmail.com",
   telepon: "Telp (0405) 2321613 · HP 0852 4197 4777",
   emailSingkat: "Email : kolakakbr@gmail.com",
@@ -2945,15 +2939,15 @@ const BANK_INFO = {
 
 const KOP_SURAT_STYLE = `
   .kop-kbr { display: flex; align-items: center; border-bottom: 3px double #000; padding-bottom: 8px; margin-bottom: 12px; }
-  .kop-kbr img { width: 78px; height: 78px; object-fit: contain; margin-right: 14px; }
-  .kop-kbr .co { flex: 1; text-align: center; font-family: "Times New Roman", Times, serif; color: #000; }
-  .kop-kbr .co h1 { margin: 0; font-size: 22pt; letter-spacing: 1px; font-weight: 700; }
+  .kop-kbr img { width: 78px; height: 78px; object-fit: contain; margin-right: 14px; padding: 4px; background: #fff; }
+  .kop-kbr .co { flex: 1; text-align: left; font-family: "Times New Roman", Times, serif; color: #000; }
+  .kop-kbr .co h1 { margin: 0; font-size: 22pt; font-weight: 700; }
   .kop-kbr .co .tag { font-style: italic; font-size: 11pt; margin-top: 2px; }
   .kop-kbr .co .addr { font-size: 10.5pt; margin-top: 3px; }
 `;
 
 function buildKopSuratHtml() {
-  const companyName = escapeHtml(BRAND.fullName || "PT. KOLAKA BUMI REALTY");
+  const companyName = "PT Kolaka Bumi Realty";
   const logo = escapeHtml(BRAND.logoSrc || "");
   const tagline = escapeHtml(KOP_SURAT_INFO.tagline);
   const alamat = escapeHtml(KOP_SURAT_INFO.alamat);
@@ -5816,23 +5810,43 @@ function AuditLogPage() {
 }
 
 // ---------- Global Search Dropdown ----------
-function GlobalSearchDropdown({ query, onClose, onNavigate }) {
+function GlobalSearchDropdown({ query, data, onClose, onNavigate }) {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const q = String(query || "").trim();
     if (q.length < 2) { setResults([]); return; }
-    let cancelled = false;
     setLoading(true);
     const timer = window.setTimeout(() => {
-      gsCall("searchAll", q)
-        .then((res) => { if (!cancelled) setResults(res || []); })
-        .catch(() => { if (!cancelled) setResults([]); })
-        .finally(() => { if (!cancelled) setLoading(false); });
-    }, 300);
-    return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [query]);
+      const normalizedQuery = q.toLocaleLowerCase("id-ID");
+      const hits = [];
+      ENTITIES.some((schema) => {
+        const rows = schema.virtual ? computeVirtualRecords(schema.key, data || {}) : ((data && data[schema.key]) || []);
+        return rows.some((record) => {
+          const searchableFields = schema.searchFields && schema.searchFields.length
+            ? schema.searchFields
+            : schema.fields.filter((field) => !field.secure).map((field) => field.key);
+          const haystack = searchableFields
+            .map((field) => String(record && record[field] != null ? record[field] : ""))
+            .join(" ")
+            .toLocaleLowerCase("id-ID");
+          if (!haystack.includes(normalizedQuery)) return false;
+          const labelField = searchableFields.find((field) => String(record && record[field] || "").trim());
+          hits.push({
+            entity: schema.key,
+            id: record.id,
+            label: (labelField && record[labelField]) || record.id || schema.label,
+            subtitle: record.status || record.statusBayar || record.statusPembayaran || record.proyek || "",
+          });
+          return hits.length >= 60;
+        });
+      });
+      setResults(hits);
+      setLoading(false);
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [query, data]);
 
   if (!query || query.trim().length < 2) return null;
 
@@ -6016,7 +6030,7 @@ function BackupPage() {
   const [backups, setBackups] = useState(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [loadError, setLoadError] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState("");
   const [restoreTarget, setRestoreTarget] = useState(null);
@@ -6028,10 +6042,13 @@ function BackupPage() {
 
   const loadBackups = () => {
     setBackups(null);
-    setLoadError(false);
+    setLoadError("");
     gsCall("listBackups")
       .then((res) => setBackups(res || []))
-      .catch(() => { setBackups([]); setLoadError(true); });
+      .catch((error) => {
+        setBackups([]);
+        setLoadError((error && error.message) || "Daftar backup tidak dapat dimuat.");
+      });
   };
   useEffect(() => { loadBackups(); }, []);
 
@@ -6040,9 +6057,10 @@ function BackupPage() {
     setRunError("");
     try {
       await gsCall("backupData");
+      pushToast("Backup data berhasil dibuat.", "success");
       loadBackups();
     } catch (e) {
-      setRunError("Gagal membuat backup. Periksa koneksi & coba lagi.");
+      setRunError((e && e.message) || "Gagal membuat backup.");
     } finally {
       setRunning(false);
     }
@@ -6056,7 +6074,7 @@ function BackupPage() {
       await gsCall("restoreBackup", target.id);
       window.location.reload();
     } catch (e) {
-      setRunError("Gagal memulihkan data dari backup ini.");
+      setRunError((e && e.message) || "Gagal memulihkan data dari backup ini.");
       setRestoring(false);
     }
   };
@@ -6089,7 +6107,7 @@ function BackupPage() {
         {backups === null ? (
           <LoadingState label="Memuat riwayat backup..." variant="table" rows={6} />
         ) : loadError ? (
-          <ErrorState onRetry={loadBackups} />
+          <ErrorState onRetry={loadBackups} message={loadError} />
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table className="kbr-data-table" style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, minWidth: 560 }}>
@@ -6301,7 +6319,7 @@ function App() {
   const deferredGlobalSearch = useDeferredValue(globalSearch);
 
   const readableEntities = (authSession && authSession.permissions && authSession.permissions.readableEntities) || [];
-  const visibleEntities = ENTITIES.filter((en) => canReadEntity(authSession, en.key));
+  const visibleEntities = ENTITIES.filter((en) => en.key !== "pengguna" && canReadEntity(authSession, en.key));
   const canBackup = !!(authSession && authSession.permissions && authSession.permissions.canBackup);
   const canManageSettings = !!(authSession && authSession.permissions && authSession.permissions.canManageUsers);
 
@@ -6322,7 +6340,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (active === "backup" || active === "pengaturan") {
+    if (active === "backup" || active === "pengaturan" || active === "pengguna") {
       setOpenMenus((prev) => (prev[NAV_SYSTEM_GROUP_KEY] ? prev : { ...prev, [NAV_SYSTEM_GROUP_KEY]: true }));
       return;
     }
@@ -6463,7 +6481,7 @@ function App() {
     setActive(key);
     if (typeof window !== "undefined" && window.innerWidth <= 1024) {
       const nextMenus = buildClosedMenus();
-      if (key === "backup" || key === "pengaturan") {
+      if (key === "backup" || key === "pengaturan" || key === "pengguna") {
         nextMenus[NAV_SYSTEM_GROUP_KEY] = true;
       } else {
         const schema = entityByKey(key);
@@ -6809,6 +6827,17 @@ function App() {
               )}
               {canManageSettings && (
                 <button
+                  className={`kbr-nav-item ${active === "pengguna" ? "active" : ""}`}
+                  onClick={() => goTo("pengguna")}
+                  title="Pengguna & Hak Akses"
+                  style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "10px 4px", borderRadius: UI.radius, border: "none", cursor: "pointer", background: active === "pengguna" ? SIDE.activeBg : "transparent", color: active === "pengguna" ? "#fff" : SIDE.text }}
+                >
+                  <UserCog size={17} strokeWidth={1.9} />
+                  <span style={{ fontSize: 9, lineHeight: 1.15, textAlign: "center" }}>Hak Akses</span>
+                </button>
+              )}
+              {canManageSettings && (
+                <button
                   className={`kbr-nav-item ${active === "pengaturan" ? "active" : ""}`}
                   onClick={() => goTo("pengaturan")}
                   title="Pengaturan Aplikasi"
@@ -6870,7 +6899,7 @@ function App() {
                     className="kbr-menu-toggle"
                     onClick={() => setOpenMenus((prev) => ({ ...prev, [NAV_SYSTEM_GROUP_KEY]: !prev[NAV_SYSTEM_GROUP_KEY] }))}
                     aria-expanded={!!openMenus[NAV_SYSTEM_GROUP_KEY]}
-                    style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: UI.radius, border: "none", background: active === "backup" || active === "pengaturan" ? SIDE.activeBg : "transparent", color: active === "backup" || active === "pengaturan" ? "#fff" : SIDE.text, cursor: "pointer", fontSize: 14, fontWeight: 400, textAlign: "left" }}
+                    style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: UI.radius, border: "none", background: active === "backup" || active === "pengaturan" || active === "pengguna" ? SIDE.activeBg : "transparent", color: active === "backup" || active === "pengaturan" || active === "pengguna" ? "#fff" : SIDE.text, cursor: "pointer", fontSize: 14, fontWeight: 400, textAlign: "left" }}
                   >
                     <Settings size={18} strokeWidth={1.9} />
                     <span style={{ flex: 1 }}>Sistem</span>
@@ -6878,6 +6907,14 @@ function App() {
                   </button>
                   {openMenus[NAV_SYSTEM_GROUP_KEY] && (
                     <div className="kbr-submenu">
+                      {canManageSettings && <button
+                        className={`kbr-nav-item kbr-subitem ${active === "pengguna" ? "active" : ""}`}
+                        onClick={() => goTo("pengguna")}
+                        style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 12px 8px 22px", borderRadius: UI.radius, border: "none", cursor: "pointer", fontSize: 13, textAlign: "left", background: active === "pengguna" ? SIDE.activeBg : "transparent", color: active === "pengguna" ? "#fff" : SIDE.text }}
+                      >
+                        <span className="kbr-bullet" />
+                        <span>Pengguna &amp; Hak Akses</span>
+                      </button>}
                       {canManageSettings && <button
                         className={`kbr-nav-item kbr-subitem ${active === "pengaturan" ? "active" : ""}`}
                         onClick={() => goTo("pengaturan")}
@@ -6935,7 +6972,7 @@ function App() {
             {searchOpen && globalSearch && (
               <>
                 <div onClick={() => setSearchOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 39 }} />
-                <GlobalSearchDropdown query={deferredGlobalSearch} onClose={() => { setSearchOpen(false); setGlobalSearch(""); }} onNavigate={(entity) => goTo(entity)} />
+                <GlobalSearchDropdown query={deferredGlobalSearch} data={data} onClose={() => { setSearchOpen(false); setGlobalSearch(""); }} onNavigate={(entity) => goTo(entity)} />
               </>
             )}
           </div>
