@@ -29,7 +29,7 @@
   <script src="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@163361a/modern-v3-firebase/blogger-runtime-config.js"></script>
   <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
   <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@a866eb1/modern-v3-firebase/app.js"></script>
+  <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@8fea78c/modern-v3-firebase/app.js"></script>
 
   <b:section class="main" id="main" maxwidgets="1" showaddelement="no">
     <b:widget id="Blog1" locked="true" title="Blog Posts" type="Blog"/>
