@@ -11,9 +11,9 @@
   <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
   <meta content="KBR Office" name="apple-mobile-web-app-title"/>
   <meta content="#33475B" name="theme-color"/>
-  <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@163361a/modern-v3-firebase/blogger-manifest.webmanifest" rel="manifest"/>
-  <link href="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@163361a/modern-v3-firebase/logo-kolakabumirealty.png" rel="icon" type="image/png"/>
-  <link href="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@163361a/modern-v3-firebase/logo-kolakabumirealty.png" rel="apple-touch-icon"/>
+  <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@6c787ac/modern-v3-firebase/blogger-manifest.webmanifest" rel="manifest"/>
+  <link href="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@6c787ac/modern-v3-firebase/logo-kolakabumirealty.png" rel="icon" type="image/png"/>
+  <link href="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@6c787ac/modern-v3-firebase/logo-kolakabumirealty.png" rel="apple-touch-icon"/>
   <title>PT Kolaka Bumi Realty</title>
   <b:skin><![CDATA[
     html, body { width: 100%; min-height: 100%; margin: 0; padding: 0; background: #F4F6F9; }
@@ -26,10 +26,10 @@
   <div id="root"><div id="kbr-loading">Memuat aplikasi...</div></div>
   <noscript><div id="kbr-loading">JavaScript wajib diaktifkan.</div></noscript>
 
-  <script src="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@163361a/modern-v3-firebase/blogger-runtime-config.js"></script>
-  <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
-  <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@8fea78c/modern-v3-firebase/app.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@6c787ac/modern-v3-firebase/blogger-runtime-config.js"></script>
+    <script crossorigin='anonymous' integrity='sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z' src='https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js'></script>
+    <script crossorigin='anonymous' integrity='sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1' src='https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js'></script>
+  <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@6c787ac/modern-v3-firebase/app.js"></script>
 
   <b:section class="main" id="main" maxwidgets="1" showaddelement="no">
     <b:widget id="Blog1" locked="true" title="Blog Posts" type="Blog"/>
