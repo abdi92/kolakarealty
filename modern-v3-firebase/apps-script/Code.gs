@@ -247,8 +247,10 @@ function firestoreFetch_(method, path, payload, query) {
 var TX_MAX_RETRIES = 3;
 
 function firestoreBaseUrl_() {
+  // Endpoint transaksi (:beginTransaction / :commit) menempel pada
+  // koleksi 'documents', bukan pada resource database.
   return 'https://firestore.googleapis.com/v1/projects/' + encodeURIComponent(getConfig_().projectId) +
-    '/databases/(default)';
+    '/databases/(default)/documents';
 }
 
 function firestoreBeginTransaction_() {
