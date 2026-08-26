@@ -17,8 +17,6 @@
 const fs = require("fs");
 const path = require("path");
 
-const KNOWN_PINS = ["163361a", "8fea78c", "0be162b", "main"];
-
 const sha = String(process.argv[2] || "").trim();
 if (!/^[0-9a-f]{7,40}$/.test(sha)) {
   console.error("Pemakaian: node tools/update-pins.js <commit-sha (7-40 hex)>");
@@ -39,30 +37,18 @@ for (const name of targets) {
     continue;
   }
   let content = fs.readFileSync(file, "utf8");
-  let count = 0;
-  for (const pin of KNOWN_PINS) {
-    const needle = `@${pin}`;
-    let idx = content.indexOf(needle);
-    while (idx !== -1) {
-      // Hanya ganti pin pada konteks URL kolakarealty jsDelivr.
-      const before = content.slice(Math.max(0, idx - 60), idx);
-      if (/kolakarealty/.test(before)) {
-        content =
-          content.slice(0, idx) + `@${sha}` + content.slice(idx + needle.length);
-        count++;
-        idx = content.indexOf(needle, idx + sha.length + 1);
-      } else {
-        idx = content.indexOf(needle, idx + needle.length);
-      }
-    }
+  // Ganti pin commit APA PUN (7-40 hex) pada referensi kolakarealty jsDelivr,
+  // termasuk ref mutable @main.
+  const re = /(kolakarealty)@([0-9a-f]{7,40}|main)/gi;
+  const matches = content.match(re) || [];
+  if (matches.length === 0) {
+    console.log(`${name}: sudah konsisten / tidak ada pin`);
+    continue;
   }
-  if (count > 0) {
-    fs.writeFileSync(file, content);
-    console.log(`${name}: ${count} pin diganti -> @${sha}`);
-    changed += count;
-  } else {
-    console.log(`${name}: sudah konsisten / tidak ada pin lama`);
-  }
+  content = content.replace(re, `$1@${sha}`);
+  fs.writeFileSync(file, content);
+  console.log(`${name}: ${matches.length} pin diganti -> @${sha}`);
+  changed += matches.length;
 }
 
 console.log(`Selesai. Total ${changed} pin disinkronkan ke @${sha}`);
