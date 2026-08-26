@@ -63,4 +63,33 @@ assert.throws(() => apply("barangkeluar", { id: "current", namaBarang: "Semen", 
 assert.throws(() => apply("transaksi", { status: "Lunas" }), /tidak diizinkan/);
 assert.strictEqual(apply("transaksi", { status: "PPJB" }, {}, { status: "Booking" }).status, "PPJB");
 
+// --- Hardening password legacy (salted hashing + kompatibilitas format lama) ---
+const nodeCrypto = require("crypto");
+context.Utilities.DigestAlgorithm = { SHA_256: "SHA_256" };
+context.Utilities.Charset = { UTF_8: "UTF_8" };
+context.Utilities.computeDigest = (_algorithm, value) => {
+  const hex = nodeCrypto.createHash("sha256").update(String(value), "utf8").digest("hex");
+  const signed = [];
+  for (let i = 0; i < hex.length; i += 2) {
+    let byte = parseInt(hex.slice(i, i + 2), 16);
+    if (byte > 127) byte -= 256;
+    signed.push(byte);
+  }
+  return signed;
+};
+context.Utilities.getRandomValues = (length) => Array.from({ length }, () => nodeCrypto.randomInt(-128, 128));
+context.Utilities.base64EncodeWebSafe = (bytes) => Buffer.from(bytes).toString("base64url");
+
+const storedSalted = context.storePasswordHash_("RahasiaKuat123");
+assert.match(storedSalted, /^sha256s:\d+:[0-9a-z]*:[0-9a-f]{64}$/, "format hash salted tidak sesuai");
+assert.strictEqual(context.matchesPassword_(storedSalted, "RahasiaKuat123"), true);
+assert.strictEqual(context.matchesPassword_(storedSalted, "rahasiaSalah"), false);
+
+// Kompatibilitas format warisan tetap diverifikasi.
+const legacySha = context.hashPassword_("LamaTerbaik2026");
+assert.match(legacySha, /^sha256:[0-9a-f]{64}$/);
+assert.strictEqual(context.matchesPassword_(legacySha, "LamaTerbaik2026"), true);
+assert.strictEqual(context.matchesPassword_("plaintextlama", "plaintextlama"), true);
+assert.strictEqual(context.matchesPassword_("plaintextlama", "salah"), false);
+
 console.log("Formula and business-logic tests passed.");

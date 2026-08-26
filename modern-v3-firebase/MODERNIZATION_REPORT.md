@@ -23,7 +23,7 @@ Versi `modern-v3` memperbaiki area tersebut tanpa mengganti API action, schema S
 |---|---|---|
 | Runtime JSX | Babel standalone di browser | Build-time esbuild |
 | HTML awal | Sekitar 410 KB | Sekitar 1,8 KB |
-| Bundle | Inline dan tidak terpisah | `app.js` minified sekitar 300 KB |
+| Bundle | Inline dan tidak terpisah | `app.js` minified ~1,4 MB pada varian firebase (Firebase SDK + mammoth terbundle; format IIFE tidak mendukung code-splitting) — varian Sheets ~300 KB |
 | Recovery render | Tidak ada boundary | `AppErrorBoundary` dengan reload UI |
 | Request baca | Setiap call membuat fetch baru | In-flight request deduplication |
 | Search | Query langsung | `useDeferredValue` |

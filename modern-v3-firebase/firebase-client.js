@@ -36,8 +36,9 @@ const ENTITY_GROUPS = {
   voucher: "KEUANGAN", kartuanggaran: "KEUANGAN", piutang: "KEUANGAN", hutang: "KEUANGAN",
   budgetcontrol: "KEUANGAN", kartupiutang: "KEUANGAN", kartubarangmasuk: "KEUANGAN",
   spkborong: "KEUANGAN", kuitansi: "KEUANGAN", approval: "KEUANGAN", supplier: "GUDANG",
-  masterbarang: "GUDANG", barangkeluar: "GUDANG", laporan: null, pengguna: null, pengaturan: null,
-};
+  masterbarang: "GUDANG", barangkeluar: "GUDANG", booking: "PENJUALAN",
+  laporan: null, pengguna: null, pengaturan: null,
+};;
 
 const PRIVILEGED_ENTITIES = new Set([
   "pengguna", "pengaturan", "transaksi", "booking", "approval", "kuitansi", "voucher", "pettycash", "bukubank",
@@ -183,8 +184,16 @@ async function callAdmin(action, args) {
 export async function saveRecord(entity, record) {
   if (PRIVILEGED_ENTITIES.has(entity)) return callAdmin("saveRecord", [entity, record]);
   if (!record || !record.id) throw new Error("record.id wajib diisi.");
-  const clean = { ...record, updatedAt: serverTimestamp() };
-  await setDoc(doc(services().db, "entities", entity, "records", String(record.id)), clean, { merge: true });
+  const ref = doc(services().db, "entities", entity, "records", String(record.id));
+  const existing = await getDoc(ref);
+  const clean = { ...record };
+  if (existing.exists() && existing.data().createdAt) {
+    clean.createdAt = existing.data().createdAt;
+  } else {
+    clean.createdAt = serverTimestamp();
+  }
+  clean.updatedAt = serverTimestamp();
+  await setDoc(ref, clean, { merge: true });
   return record;
 }
 

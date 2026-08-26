@@ -1,4 +1,4 @@
-var CONFIG_KEYS = {
+﻿var CONFIG_KEYS = {
   projectId: 'FIREBASE_PROJECT_ID',
   webApiKey: 'FIREBASE_WEB_API_KEY'
 };
@@ -11,17 +11,26 @@ var PRIVILEGED_ENTITIES = [
   'kartubarangmasuk', 'barangkeluar', 'komisi', 'pph', 'bphtb', 'pengajuankpr',
   'pencairankpr', 'spkborong', 'pricelist', 'targetmarketing', 'tagihan'
 ];
+// Registry entitas kanonik. Sumber tunggal untuk cakupan backup/restore dan
+// searchAll. HARUS konsisten dengan PRIVILEGED_ENTITIES di bawah serta
+// ENTITY_GROUPS/PRIVILEGED_ENTITIES pada firebase-client.js (divalidasi oleh
+// architecture.test.js).
 var ALL_ENTITIES = [
   'proyek', 'clusterproyek', 'progressunit', 'updateharian', 'materialrequest',
   'budgetkonstruksi', 'blokkavling', 'unit', 'pricelist', 'sertifikat', 'perizinan',
   'dokumenlegal', 'ppjb', 'sppt', 'sengketa', 'berkaskpr', 'prosesbank', 'appraisal',
   'pencairankpr', 'akadajb', 'baliknama', 'royaht', 'pph', 'bphtb', 'pembeli',
-  'transaksi', 'jualicicilan', 'pengajuankpr', 'jadwalcicilan', 'unitpihak', 'tagihan',
-  'marketing', 'prospek', 'followup', 'targetmarketing', 'komisi', 'arsipdokumen',
-  'pettycash', 'bukubank', 'voucher', 'kartuanggaran', 'piutang', 'hutang',
-  'budgetcontrol', 'kartupiutang', 'kartubarangmasuk', 'spkborong', 'kuitansi',
-  'approval', 'supplier', 'masterbarang', 'barangkeluar', 'arsipdokumen', 'generatesurat',
-  'laporan', 'pengaturan'
+  'transaksi', 'booking', 'jualicicilan', 'pengajuankpr', 'jadwalcicilan', 'unitpihak',
+  'tagihan', 'marketing', 'prospek', 'followup', 'targetmarketing', 'komisi',
+  'arsipdokumen', 'generatesurat', 'pettycash', 'bukubank', 'voucher', 'kartuanggaran',
+  'piutang', 'hutang', 'budgetcontrol', 'kartupiutang', 'kartubarangmasuk', 'spkborong',
+  'kuitansi', 'approval', 'supplier', 'masterbarang', 'barangkeluar',
+  // Entitas warisan Google Sheets tetap dicakup backup/restore/search agar
+  // data hasil migrasi tidak pernah tertinggal dari snapshot.
+  'pembayaran', 'penjual', 'kprsubsidi', 'kprkomersil', 'kprsyariah',
+  'skemapembayaran', 'masterpihak', 'masterunit', 'progressproyek',
+  'timelinerencana', 'pajakpbb', 'prosesbanknotaris', 'stokgudang',
+  'laporankeuangan', 'dashboardowner', 'laporan', 'pengaturan'
 ];
 
 function jsonResponse_(payload) {
@@ -29,8 +38,57 @@ function jsonResponse_(payload) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// Kode error stabil agar klien dapat bercabang tanpa parsing pesan teks.
+var ERROR_CODES = {
+  VALIDATION: 'VALIDATION_ERROR',
+  AUTH: 'AUTH_ERROR',
+  FORBIDDEN: 'FORBIDDEN',
+  NOT_FOUND: 'NOT_FOUND',
+  CONFLICT: 'CONFLICT',
+  RATE_LIMIT: 'RATE_LIMITED',
+  INTERNAL: 'INTERNAL_ERROR'
+};
+
+function apiError_(code, message) {
+  var error = new Error(String(message || 'Terjadi kesalahan.'));
+  error.code = code || ERROR_CODES.INTERNAL;
+  return error;
+}
+
+// Pesan untuk klien dibersihkan dari detail internal (path API, body upstream).
+function sanitizeErrorMessage_(message) {
+  var text = String(message || 'Terjadi kesalahan.');
+  if (/Firestore API gagal \(\d+\)/.test(text)) {
+    return apiError_(ERROR_CODES.INTERNAL, 'Operasi database sementara gagal. Coba lagi atau hubungi administrator.');
+  }
+  if (/Firebase Auth Admin gagal \(\d+\)/.test(text)) {
+    return apiError_(ERROR_CODES.INTERNAL, 'Operasi akun pengguna sementara gagal. Coba lagi atau hubungi administrator.');
+  }
+  if (/Identity Toolkit|API key not valid|PERMISSION_DENIED|UNAUTHENTICATED/i.test(text)) {
+    return apiError_(ERROR_CODES.AUTH, 'Sesi tidak valid. Silakan login ulang.');
+  }
+  return null;
+}
+
 function doGet() {
   return jsonResponse_({ success: true, data: { service: 'KBR Firebase Admin API', status: 'ok' } });
+}
+
+// Throttle sederhana per-user via CacheService: maksimal 120 aksi tulis
+// berat per menit (backup/restore/search/save) untuk membatasi abuse.
+var HEAVY_ACTION_LIMIT = 120;
+var HEAVY_ACTION_WINDOW_SECONDS = 60;
+
+function assertHeavyActionQuota_(uid, action) {
+  var heavy = ['saveRecord', 'deleteRecord', 'uploadFile', 'deleteFile', 'backupData', 'restoreBackup', 'searchAll'];
+  if (heavy.indexOf(String(action || '')) === -1) return;
+  var cache = CacheService.getScriptCache();
+  var key = 'kbr-admin-quota:' + String(uid || 'anon');
+  var count = Number(cache.get(key) || 0);
+  if (count >= HEAVY_ACTION_LIMIT) {
+    throw apiError_(ERROR_CODES.RATE_LIMIT, 'Terlalu banyak operasi. Tunggu sebentar lalu coba lagi.');
+  }
+  cache.put(key, String(count + 1), HEAVY_ACTION_WINDOW_SECONDS);
 }
 
 function doPost(event) {
@@ -38,10 +96,19 @@ function doPost(event) {
     var request = JSON.parse(event && event.postData && event.postData.contents || '{}');
     var session = requireFirebaseSession_(request.idToken);
     var args = Array.isArray(request.args) ? request.args : [];
-    var result = routeAction_(session, String(request.action || ''), args);
+    var action = String(request.action || '');
+    assertHeavyActionQuota_(session.uid, action);
+    var result = routeAction_(session, action, args);
     return jsonResponse_({ success: true, data: result });
   } catch (error) {
-    return jsonResponse_({ success: false, message: String(error && error.message || error) });
+    var raw = String(error && error.message || error);
+    var sanitized = sanitizeErrorMessage_(raw);
+    if (sanitized) return jsonResponse_({ success: false, message: sanitized.message, error: sanitized.code });
+    return jsonResponse_({
+      success: false,
+      message: raw,
+      error: (error && error.code) || ERROR_CODES.VALIDATION
+    });
   }
 }
 
@@ -67,14 +134,14 @@ function getConfig_() {
   var projectId = String(properties.getProperty(CONFIG_KEYS.projectId) || '').trim();
   var webApiKey = String(properties.getProperty(CONFIG_KEYS.webApiKey) || '').trim();
   if (!projectId || !webApiKey) {
-    throw new Error('FIREBASE_PROJECT_ID dan FIREBASE_WEB_API_KEY wajib diisi di Script Properties.');
+    throw apiError_(ERROR_CODES.INTERNAL, 'FIREBASE_PROJECT_ID dan FIREBASE_WEB_API_KEY wajib diisi di Script Properties.');
   }
   return { projectId: projectId, webApiKey: webApiKey };
 }
 
 function requireFirebaseSession_(idToken) {
   var token = String(idToken || '').trim();
-  if (!token) throw new Error('Firebase ID token wajib diisi.');
+  if (!token) throw apiError_(ERROR_CODES.AUTH, 'Firebase ID token wajib diisi.');
   var config = getConfig_();
   var response = UrlFetchApp.fetch(
     'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + encodeURIComponent(config.webApiKey),
@@ -85,11 +152,11 @@ function requireFirebaseSession_(idToken) {
       muteHttpExceptions: true
     }
   );
-  if (response.getResponseCode() !== 200) throw new Error('Firebase ID token tidak valid atau kedaluwarsa.');
+  if (response.getResponseCode() !== 200) throw apiError_(ERROR_CODES.AUTH, 'Firebase ID token tidak valid atau kedaluwarsa.');
   var account = (JSON.parse(response.getContentText()).users || [])[0];
-  if (!account || !account.localId) throw new Error('Identitas Firebase tidak ditemukan.');
+  if (!account || !account.localId) throw apiError_(ERROR_CODES.AUTH, 'Identitas Firebase tidak ditemukan.');
   var profile = getDocument_('users/' + encodeURIComponent(account.localId));
-  if (!profile || String(profile.status || '').toLowerCase() !== 'aktif') throw new Error('Akun tidak aktif.');
+  if (!profile || String(profile.status || '').toLowerCase() !== 'aktif') throw apiError_(ERROR_CODES.FORBIDDEN, 'Akun tidak aktif.');
   return {
     uid: account.localId,
     email: account.email || '',
@@ -101,7 +168,7 @@ function requireFirebaseSession_(idToken) {
 
 function requireAdministrator_(session) {
   if (session.role !== 'Superadmin' && session.role !== 'Admin') {
-    throw new Error('Operasi ini hanya dapat dilakukan Admin atau Superadmin.');
+    throw apiError_(ERROR_CODES.FORBIDDEN, 'Operasi ini hanya dapat dilakukan Admin atau Superadmin.');
   }
 }
 
@@ -119,7 +186,11 @@ function identityAdminFetch_(method, suffix, payload) {
   );
   var code = response.getResponseCode();
   var text = response.getContentText();
-  if (code < 200 || code >= 300) throw new Error('Firebase Auth Admin gagal (' + code + '): ' + text.slice(0, 500));
+  if (code < 200 || code >= 300) {
+    // Detail upstream hanya ke log internal, tidak pernah dikirim ke klien.
+    console.error('Firebase Auth Admin gagal (' + code + '): ' + text.slice(0, 500));
+    throw apiError_(ERROR_CODES.INTERNAL, 'Operasi akun pengguna sementara gagal.');
+  }
   return text ? JSON.parse(text) : true;
 }
 
@@ -162,8 +233,91 @@ function firestoreFetch_(method, path, payload, query) {
   var code = response.getResponseCode();
   var text = response.getContentText();
   if (code === 404) return null;
-  if (code < 200 || code >= 300) throw new Error('Firestore API gagal (' + code + '): ' + text.slice(0, 500));
+  if (code < 200 || code >= 300) {
+    console.error('Firestore API gagal (' + code + '): ' + text.slice(0, 500));
+    throw apiError_(code === 429 ? ERROR_CODES.RATE_LIMIT : ERROR_CODES.INTERNAL,
+      code === 429 ? 'Database sedang sibuk. Coba lagi sebentar.' : 'Operasi database sementara gagal.');
+  }
   return text ? JSON.parse(text) : true;
+}
+
+// ===== Transaksi Firestore (REST) =====
+// Menutup celah TOCTOU: baca-dalam-transaksi + commit atomik, dengan retry
+// otomatis saat terjadi contention (ABORTED).
+var TX_MAX_RETRIES = 3;
+
+function firestoreBaseUrl_() {
+  return 'https://firestore.googleapis.com/v1/projects/' + encodeURIComponent(getConfig_().projectId) +
+    '/databases/(default)';
+}
+
+function firestoreBeginTransaction_() {
+  var response = UrlFetchApp.fetch(firestoreBaseUrl_() + ':beginTransaction', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+    payload: JSON.stringify({ options: { readWrite: {} } }),
+    muteHttpExceptions: true
+  });
+  var text = response.getContentText();
+  if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) {
+    console.error('beginTransaction gagal (' + response.getResponseCode() + '): ' + text.slice(0, 500));
+    throw apiError_(ERROR_CODES.INTERNAL, 'Operasi database sementara gagal.');
+  }
+  return JSON.parse(text).transaction;
+}
+
+function firestoreGetInTransaction_(path, transaction) {
+  var url = firestoreUrl_(path) + '?transaction=' + encodeURIComponent(transaction);
+  var response = UrlFetchApp.fetch(url, {
+    method: 'get',
+    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+    muteHttpExceptions: true
+  });
+  var code = response.getResponseCode();
+  var text = response.getContentText();
+  if (code === 404) return null;
+  if (code < 200 || code >= 300) {
+    console.error('Firestore tx get gagal (' + code + '): ' + text.slice(0, 500));
+    throw apiError_(ERROR_CODES.INTERNAL, 'Operasi database sementara gagal.');
+  }
+  return JSON.parse(text);
+}
+
+function firestoreCommitTransaction_(transaction, writes) {
+  var response = UrlFetchApp.fetch(firestoreBaseUrl_() + ':commit', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+    payload: JSON.stringify({ transaction: transaction, writes: writes }),
+    muteHttpExceptions: true
+  });
+  var code = response.getResponseCode();
+  var text = response.getContentText();
+  if (code >= 200 && code < 300) return text ? JSON.parse(text) : true;
+  // 409 ABORTED = contention; caller melakukan retry transaksi baru.
+  if (code === 409) throw apiError_(ERROR_CODES.CONFLICT, '__TX_ABORTED__');
+  console.error('commit gagal (' + code + '): ' + text.slice(0, 500));
+  throw apiError_(ERROR_CODES.INTERNAL, 'Operasi database sementara gagal.');
+}
+
+// Patch dokumen di dalam transaksi (tanpa precondition tambahan â€” transaksi
+// sudah menjamin snapshot konsisten).
+function txPatchWrite_(path, data) {
+  return { update: { name: recordDocName_(path), fields: toFields_(data) } };
+}
+
+function recordDocName_(path) {
+  var base = 'projects/' + getConfig_().projectId + '/databases/(default)/documents/';
+  return base + path;
+}
+
+function txDeleteWrite_(path) {
+  return { delete: recordDocName_(path) };
+}
+
+function isTxAborted_(error) {
+  return error && error.message === '__TX_ABORTED__';
 }
 
 function toValue_(value) {
@@ -370,72 +524,140 @@ function validateAndDerive_(entity, record, existing) {
   return result;
 }
 
-function assertNoDoubleBooking_(entity, record) {
+function assertNoDoubleBooking_(entity, record, otherRecords) {
   if (entity !== 'transaksi' && entity !== 'booking') return;
   if (['booking', 'ppjb', 'akad kredit', 'lunas'].indexOf(normalized_(record.status)) === -1) return;
   var key = normalized_(record.proyek) + '|' + normalized_(record.nomorUnit || record.unit);
-  listCollection_('entities/' + encodeURIComponent(entity) + '/records').forEach(function (other) {
+  (otherRecords || []).forEach(function (other) {
     var otherKey = normalized_(other.proyek) + '|' + normalized_(other.nomorUnit || other.unit);
     if (String(other.id) !== String(record.id) && otherKey === key && ['booking', 'ppjb', 'akad kredit', 'lunas'].indexOf(normalized_(other.status)) !== -1) {
-      throw new Error('Double booking ditolak: unit sudah memiliki transaksi aktif.');
+      throw apiError_(ERROR_CODES.CONFLICT, 'Double booking ditolak: unit sudah memiliki transaksi aktif.');
     }
   });
+}
+
+// Membaca seluruh dokumen koleksi DI DALAM transaksi sehingga pemeriksaan
+// double-booking dan penulisan berbagi snapshot konsisten (menutup TOCTOU).
+function listCollectionInTransaction_(entity, transaction) {
+  var url = firestoreUrl_('entities/' + encodeURIComponent(entity)) + ':runQuery';
+  var response = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+    payload: JSON.stringify({
+      transaction: transaction,
+      structuredQuery: { from: [{ collectionId: 'records' }] }
+    }),
+    muteHttpExceptions: true
+  });
+  var code = response.getResponseCode();
+  var text = response.getContentText();
+  if (code < 200 || code >= 300) {
+    console.error('runQuery tx gagal (' + code + '): ' + text.slice(0, 500));
+    throw apiError_(ERROR_CODES.INTERNAL, 'Operasi database sementara gagal.');
+  }
+  var result = [];
+  JSON.parse(text).forEach(function (row) {
+    if (!row || !row.document) return;
+    var record = fromFields_(row.document.fields || {});
+    if (!record.id) record.id = row.document.name.split('/').pop();
+    result.push(record);
+  });
+  return result;
+}
+
+function runWithTransaction_(fn) {
+  var lastError = null;
+  for (var attempt = 0; attempt < TX_MAX_RETRIES; attempt++) {
+    var transaction = firestoreBeginTransaction_();
+    try {
+      return fn(transaction);
+    } catch (error) {
+      lastError = error;
+      if (!isTxAborted_(error)) throw error;
+      Utilities.sleep(150 * (attempt + 1));
+    }
+  }
+  throw apiError_(ERROR_CODES.CONFLICT,
+    'Database sedang sibuk oleh perubahan lain. Ulangi beberapa saat lagi.');
 }
 
 function saveRecord_(session, entity, record) {
   requireAdministrator_(session);
   entity = String(entity || '').trim();
   if (PRIVILEGED_ENTITIES.indexOf(entity) === -1) throw new Error('Entity ini harus ditulis langsung melalui Firestore Rules.');
-  if (!record || !record.id) throw new Error('record.id wajib diisi.');
+  if (!record || !record.id) throw apiError_(ERROR_CODES.VALIDATION, 'record.id wajib diisi.');
   if (entity === 'pengaturan' && session.role !== 'Superadmin') {
-    throw new Error('Hanya Superadmin yang dapat mengubah pengaturan aplikasi.');
+    throw apiError_(ERROR_CODES.FORBIDDEN, 'Hanya Superadmin yang dapat mengubah pengaturan aplikasi.');
   }
   if (entity === 'pengguna') {
-    if (session.role !== 'Superadmin') throw new Error('Hanya Superadmin yang dapat mengelola profil pengguna.');
+    if (session.role !== 'Superadmin') throw apiError_(ERROR_CODES.FORBIDDEN, 'Hanya Superadmin yang dapat mengelola profil pengguna.');
     var existingProfile = getDocument_('users/' + encodeURIComponent(record.id));
     var password = String(record.password || '');
     if (!existingProfile) {
-      if (!record.email) throw new Error('Email pengguna wajib diisi.');
-      if (password.length < 8) throw new Error('Password pengguna minimal 8 karakter.');
+      if (!record.email) throw apiError_(ERROR_CODES.VALIDATION, 'Email pengguna wajib diisi.');
+      if (password.length < 8) throw apiError_(ERROR_CODES.VALIDATION, 'Password pengguna minimal 8 karakter.');
       record.id = createAuthUser_(record.email, password, record.nama);
     } else if (password) {
-      if (password.length < 8) throw new Error('Password pengguna minimal 8 karakter.');
+      if (password.length < 8) throw apiError_(ERROR_CODES.VALIDATION, 'Password pengguna minimal 8 karakter.');
       updateAuthPassword_(record.id, password);
     }
     delete record.password;
     delete record.passwordHash;
     delete record.pin;
     delete record.pinHash;
+    // Status kanonik: selalu kapitalisasi 'Aktif' agar konsisten dengan rules.
+    record.status = normalized_(record.status) === 'aktif' || !record.status ? 'Aktif' : String(record.status).trim();
     record.updatedAt = new Date().toISOString();
+    if (!existingProfile) record.createdAt = record.updatedAt;
     setDocument_('users/' + encodeURIComponent(record.id), record);
-  } else {
-    var path = recordPath_(entity, record.id);
-    var existing = getDocument_(path);
-    record = validateAndDerive_(entity, record, existing);
-    assertNoDoubleBooking_(entity, record);
-    record.updatedAt = new Date().toISOString();
-    setDocument_(path, record);
+    appendAudit_(session, existingProfile ? 'UPDATE' : 'CREATE', entity, record.id, {});
+    return record;
   }
-  appendAudit_(session, existing ? 'UPDATE' : 'CREATE', entity, record.id, {});
-  return record;
+  var auditAction = '';
+  var saved = runWithTransaction_(function (transaction) {
+    var path = recordPath_(entity, record.id);
+    var document = firestoreGetInTransaction_(path, transaction);
+    var existing = document ? fromFields_(document.fields || {}) : null;
+    var derived = validateAndDerive_(entity, record, existing);
+    var needsScan = entity === 'transaksi' || entity === 'booking';
+    var siblings = needsScan ? listCollectionInTransaction_(entity, transaction) : [];
+    assertNoDoubleBooking_(entity, derived, siblings);
+    derived.updatedAt = new Date().toISOString();
+    derived.createdAt = existing && existing.createdAt ? existing.createdAt : derived.updatedAt;
+    firestoreCommitTransaction_(transaction, [txPatchWrite_(path, derived)]);
+    auditAction = existing ? 'UPDATE' : 'CREATE';
+    return derived;
+  });
+  appendAudit_(session, auditAction, entity, record.id, {});
+  return saved;
 }
 
 function deleteRecord_(session, entity, id) {
   requireAdministrator_(session);
-  if (PRIVILEGED_ENTITIES.indexOf(String(entity)) === -1) throw new Error('Entity ini harus dihapus langsung melalui Firestore Rules.');
-  if ((entity === 'pengguna' || entity === 'pengaturan') && session.role !== 'Superadmin') throw new Error('Hanya Superadmin yang dapat mengelola data ini.');
+  entity = String(entity || '').trim();
+  if (PRIVILEGED_ENTITIES.indexOf(entity) === -1) throw new Error('Entity ini harus dihapus langsung melalui Firestore Rules.');
+  if ((entity === 'pengguna' || entity === 'pengaturan') && session.role !== 'Superadmin') {
+    throw apiError_(ERROR_CODES.FORBIDDEN, 'Hanya Superadmin yang dapat mengelola data ini.');
+  }
   if (entity === 'pengguna') {
     deleteAuthUser_(id);
     deleteDocument_('users/' + encodeURIComponent(id));
   } else {
-    deleteDocument_(recordPath_(entity, id));
+    runWithTransaction_(function (transaction) {
+      var path = recordPath_(entity, id);
+      var document = firestoreGetInTransaction_(path, transaction);
+      if (!document) throw apiError_(ERROR_CODES.NOT_FOUND, 'Data tidak ditemukan atau sudah dihapus.');
+      firestoreCommitTransaction_(transaction, [txDeleteWrite_(path)]);
+      return true;
+    });
   }
   appendAudit_(session, 'DELETE', entity, id, {});
   return true;
 }
 
 function resetUserPassword_(session, userId, newPassword) {
-  if (session.role !== 'Superadmin') throw new Error('Hanya Superadmin yang dapat mereset password.');
+  if (session.role !== 'Superadmin') throw apiError_(ERROR_CODES.FORBIDDEN, 'Hanya Superadmin yang dapat mereset password.');
   if (String(newPassword || '').length < 8) throw new Error('Password baru minimal 8 karakter.');
   updateAuthPassword_(userId, newPassword);
   appendAudit_(session, 'RESET_PASSWORD', 'pengguna', userId, {});
@@ -451,7 +673,7 @@ function appendAudit_(session, action, entity, recordId, details) {
 }
 
 function listAuditLog_(session, limit) {
-  if (session.role !== 'Superadmin') throw new Error('Hanya Superadmin yang dapat melihat audit log.');
+  if (session.role !== 'Superadmin') throw apiError_(ERROR_CODES.FORBIDDEN, 'Hanya Superadmin yang dapat melihat audit log.');
   return listCollection_('auditLogs', limit || 500).sort(function (a, b) { return String(b.timestamp).localeCompare(String(a.timestamp)); });
 }
 
@@ -465,7 +687,7 @@ function uploadFile_(session, entity, fileName, mimeType, base64Data) {
   entity = String(entity || '').trim();
   fileName = String(fileName || '').trim();
   mimeType = String(mimeType || '').toLowerCase();
-  if (entity === 'pengaturan' && session.role !== 'Superadmin') throw new Error('Hanya Superadmin yang dapat mengunggah aset pengaturan.');
+  if (entity === 'pengaturan' && session.role !== 'Superadmin') throw apiError_(ERROR_CODES.FORBIDDEN, 'Hanya Superadmin yang dapat mengunggah aset pengaturan.');
   var bytes = Utilities.base64Decode(String(base64Data || ''));
   if (!fileName || !bytes.length) throw new Error('File wajib diisi.');
   if (bytes.length > MAX_UPLOAD_BYTES) throw new Error('Ukuran file maksimal 8 MB.');
@@ -490,14 +712,26 @@ function uploadFile_(session, entity, fileName, mimeType, base64Data) {
 
 function deleteFile_(session, entity, fileId) {
   requireAdministrator_(session);
-  if (String(entity || '') === 'pengaturan' && session.role !== 'Superadmin') throw new Error('Hanya Superadmin yang dapat menghapus aset pengaturan.');
-  DriveApp.getFileById(fileId).setTrashed(true);
+  if (String(entity || '') === 'pengaturan' && session.role !== 'Superadmin') {
+    throw apiError_(ERROR_CODES.FORBIDDEN, 'Hanya Superadmin yang dapat menghapus aset pengaturan.');
+  }
+  // Least privilege: hanya file dalam folder dokumen KBR yang boleh dihapus,
+  // bukan file Drive lain mana pun yang kebetulan bisa dijangkau service account.
+  var file = DriveApp.getFileById(String(fileId || '').trim());
+  var allowedFolders = [ensureFolder_(DOC_FOLDER_NAME).getId(), ensureFolder_(BACKUP_FOLDER_NAME).getId()];
+  var parents = file.getParents();
+  var belongs = false;
+  while (parents.hasNext()) {
+    if (allowedFolders.indexOf(parents.next().getId()) !== -1) { belongs = true; break; }
+  }
+  if (!belongs) throw apiError_(ERROR_CODES.FORBIDDEN, 'File berada di luar penyimpanan dokumen aplikasi.');
+  file.setTrashed(true);
   appendAudit_(session, 'DELETE_FILE', entity, fileId, {});
   return true;
 }
 
 function backupData_(session) {
-  if (session.role !== 'Superadmin') throw new Error('Hanya Superadmin yang dapat membuat backup.');
+  if (session.role !== 'Superadmin') throw apiError_(ERROR_CODES.FORBIDDEN, 'Hanya Superadmin yang dapat membuat backup.');
   var snapshot = { exportedAt: new Date().toISOString(), users: listCollection_('users'), entities: {} };
   ALL_ENTITIES.forEach(function (entity) {
     snapshot.entities[entity] = listCollection_('entities/' + encodeURIComponent(entity) + '/records');
@@ -509,7 +743,7 @@ function backupData_(session) {
 }
 
 function listBackups_(session) {
-  if (session.role !== 'Superadmin') throw new Error('Hanya Superadmin yang dapat melihat backup.');
+  if (session.role !== 'Superadmin') throw apiError_(ERROR_CODES.FORBIDDEN, 'Hanya Superadmin yang dapat melihat backup.');
   var files = ensureFolder_(BACKUP_FOLDER_NAME).getFiles();
   var result = [];
   while (files.hasNext()) {
@@ -520,7 +754,7 @@ function listBackups_(session) {
 }
 
 function restoreBackup_(session, fileId) {
-  if (session.role !== 'Superadmin') throw new Error('Hanya Superadmin yang dapat memulihkan backup.');
+  if (session.role !== 'Superadmin') throw apiError_(ERROR_CODES.FORBIDDEN, 'Hanya Superadmin yang dapat memulihkan backup.');
   var id = String(fileId || '').trim();
   if (!id) throw new Error('File backup wajib dipilih.');
 
@@ -550,11 +784,14 @@ function restoreBackup_(session, fileId) {
   snapshot.users.forEach(function (user) {
     if (user && user.id) snapshotUserIds[String(user.id)] = true;
   });
-  listCollection_('users').forEach(function (user) {
-    if (user && user.id && !snapshotUserIds[String(user.id)]) {
-      deleteDocument_('users/' + encodeURIComponent(user.id));
-    }
-  });
+
+  // Urutan aman: tulis SEMUA data snapshot lebih dulu, baru hapus dokumen
+  // yang tidak ada di snapshot. Kegagalan di tengah jalan tidak pernah
+  // meninggalkan database kosong.
+  var written = 0;
+  var deleted = 0;
+  var orphanedAuthUsers = [];
+
   snapshot.users.forEach(function (user) {
     if (!user || !user.id) return;
     var cleanUser = JSON.parse(JSON.stringify(user));
@@ -562,25 +799,45 @@ function restoreBackup_(session, fileId) {
     delete cleanUser.passwordHash;
     delete cleanUser.pin;
     delete cleanUser.pinHash;
+    if (!cleanUser.createdAt) cleanUser.createdAt = snapshot.exportedAt || new Date().toISOString();
     setDocument_('users/' + encodeURIComponent(cleanUser.id), cleanUser);
+    written++;
   });
+  listCollection_('users').forEach(function (user) {
+    if (user && user.id && !snapshotUserIds[String(user.id)]) {
+      // Profil Firestore dihapus, namun akun Firebase Auth TIDAK dihapus
+      // di sini agar kegagalan parsial tidak memutus akses secara permanen.
+      // Daftarkan sebagai orphan untuk ditinjau Superadmin.
+      orphanedAuthUsers.push(String(user.id));
+      deleteDocument_('users/' + encodeURIComponent(user.id));
+      deleted++;
+    }
+  });
+
   ALL_ENTITIES.forEach(function (entity) {
     var records = Array.isArray(snapshot.entities[entity]) ? snapshot.entities[entity] : [];
     var snapshotRecordIds = {};
     records.forEach(function (record) {
       if (record && record.id) snapshotRecordIds[String(record.id)] = true;
     });
+    records.forEach(function (record) {
+      if (record && record.id) {
+        var clean = JSON.parse(JSON.stringify(record));
+        if (!clean.createdAt) clean.createdAt = snapshot.exportedAt || new Date().toISOString();
+        setDocument_(recordPath_(entity, record.id), clean);
+        written++;
+      }
+    });
     listCollection_('entities/' + encodeURIComponent(entity) + '/records').forEach(function (record) {
       if (record && record.id && !snapshotRecordIds[String(record.id)]) {
         deleteDocument_(recordPath_(entity, record.id));
+        deleted++;
       }
     });
-    records.forEach(function (record) {
-      if (record && record.id) setDocument_(recordPath_(entity, record.id), record);
-    });
   });
-  appendAudit_(session, 'RESTORE_BACKUP', 'system', id, { name: file.getName() });
-  return { restored: true, fileId: id, fileName: file.getName() };
+
+  appendAudit_(session, 'RESTORE_BACKUP', 'system', id, { name: file.getName(), written: written, deleted: deleted });
+  return { restored: true, fileId: id, fileName: file.getName(), written: written, deleted: deleted, orphanedAuthUsers: orphanedAuthUsers };
 }
 
 function searchAll_(session, query) {
@@ -600,13 +857,67 @@ function searchAll_(session, query) {
 function getFinanceSummary_(session) {
   var pettycash = listCollection_('entities/pettycash/records');
   var bukubank = listCollection_('entities/bukubank/records');
+  var piutang = listCollection_('entities/piutang/records');
+  var hutang = listCollection_('entities/hutang/records');
+  var budget = listCollection_('entities/budgetcontrol/records');
+
   var totalMasuk = 0;
   var totalKeluar = 0;
+  var perAkun = {};
   pettycash.concat(bukubank).forEach(function (row) {
-    totalMasuk += Number(row.kredit || 0);
-    totalKeluar += Number(row.debet || 0);
+    var masuk = Number(row.kredit || 0);
+    var keluar = Number(row.debet || 0);
+    totalMasuk += masuk;
+    totalKeluar += keluar;
+    var akun = String(row.akun || row.kategori || 'Tanpa Akun').trim() || 'Tanpa Akun';
+    if (!perAkun[akun]) perAkun[akun] = { akun: akun, masuk: 0, keluar: 0 };
+    perAkun[akun].masuk += masuk;
+    perAkun[akun].keluar += keluar;
   });
-  return { totalMasuk: totalMasuk, totalKeluar: totalKeluar, netCashflow: totalMasuk - totalKeluar, totalPiutangOpen: 0, totalHutangOpen: 0, totalBudgetRencana: 0, totalBudgetRealisasi: 0, sisaBudget: 0, perAkun: [], perKategoriKeluar: [] };
+
+  var openPiutang = 0;
+  piutang.forEach(function (row) {
+    if (normalized_(row.status) === 'batal') return;
+    var sisa = Number(row.sisaPiutang == null ? (Number(row.hargaTransaksi || 0) - Number(row.totalDibayar || 0)) : row.sisaPiutang);
+    if (sisa > 0) openPiutang += sisa;
+  });
+  var openHutang = 0;
+  hutang.forEach(function (row) {
+    if (normalized_(row.status) === 'batal') return;
+    var sisa = Number(row.sisaHutang == null ? (Number(row.nilaiKontrak || 0) - Number(row.totalDibayar || 0)) : row.sisaHutang);
+    if (sisa > 0) openHutang += sisa;
+  });
+
+  var totalBudgetRencana = 0;
+  var totalBudgetRealisasi = 0;
+  var perKategoriKeluar = {};
+  budget.forEach(function (row) {
+    var rencana = Number(row.rencanaBudget || 0);
+    var realisasi = Number(row.realisasi || 0);
+    totalBudgetRencana += rencana;
+    totalBudgetRealisasi += realisasi;
+    var kategori = String(row.kategori || row.pekerjaan || 'Lainnya').trim() || 'Lainnya';
+    if (!perKategoriKeluar[kategori]) perKategoriKeluar[kategori] = { kategori: kategori, realisasi: 0 };
+    perKategoriKeluar[kategori].realisasi += realisasi;
+  });
+  Object.keys(perKategoriKeluar).forEach(function (key) { perKategoriKeluar[key].realisasi = Math.round(perKategoriKeluar[key].realisasi); });
+
+  return {
+    totalMasuk: Math.round(totalMasuk),
+    totalKeluar: Math.round(totalKeluar),
+    netCashflow: Math.round(totalMasuk - totalKeluar),
+    totalPiutangOpen: Math.round(openPiutang),
+    totalHutangOpen: Math.round(openHutang),
+    totalBudgetRencana: Math.round(totalBudgetRencana),
+    totalBudgetRealisasi: Math.round(totalBudgetRealisasi),
+    sisaBudget: Math.round(totalBudgetRencana - totalBudgetRealisasi),
+    perAkun: Object.keys(perAkun).map(function (key) {
+      return { akun: key, masuk: Math.round(perAkun[key].masuk), keluar: Math.round(perAkun[key].keluar) };
+    }),
+    perKategoriKeluar: Object.keys(perKategoriKeluar).map(function (key) {
+      return { kategori: key, realisasi: perKategoriKeluar[key].realisasi };
+    })
+  };
 }
 
 function migrateLegacySheetToFirestore() {
@@ -615,22 +926,53 @@ function migrateLegacySheetToFirestore() {
   var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues();
   var migrated = 0;
   var skipped = 0;
+  var skippedReasons = [];
   values.forEach(function (row) {
     try {
       var entity = String(row[0] || '').trim();
       var id = String(row[1] || '').trim();
-      var record = JSON.parse(row[2]);
       if (!entity || !id) throw new Error('Entity/id kosong');
+      var record;
+      try {
+        record = JSON.parse(row[2]);
+      } catch (parseError) {
+        throw new Error('JSON tidak valid pada baris entity=' + entity + ', id=' + id);
+      }
       record.id = id;
       if (entity === 'pengguna') {
         skipped++;
+        skippedReasons.push(entity + '/' + id + ': akun dibuat melalui Firebase Auth');
         return;
       }
+      if (!record.createdAt) record.createdAt = record.updatedAt || new Date().toISOString();
       setDocument_(recordPath_(entity, id), record);
       migrated++;
     } catch (error) {
       skipped++;
+      skippedReasons.push(String(error && error.message || error));
     }
   });
-  return { migrated: migrated, skipped: skipped };
+  return { migrated: migrated, skipped: skipped, skippedReasons: skippedReasons };
+}
+
+// Maintenance satu kali (dijalankan manual oleh Superadmin dari editor GAS):
+// menormalkan casing status profil pengguna ke 'Aktif' dan memastikan
+// setiap profil memiliki createdAt.
+function normalizeUserProfileStatuses() {
+  var normalized = 0;
+  listCollection_('users').forEach(function (user) {
+    if (!user || !user.id) return;
+    var patch = {};
+    if (normalized_(user.status) === 'aktif' && user.status !== 'Aktif') {
+      patch.status = 'Aktif';
+    }
+    if (!user.createdAt) {
+      patch.createdAt = user.updatedAt || new Date().toISOString();
+    }
+    if (Object.keys(patch).length) {
+      setDocument_('users/' + encodeURIComponent(user.id), Object.assign({}, user, patch));
+      normalized++;
+    }
+  });
+  return { normalized: normalized };
 }

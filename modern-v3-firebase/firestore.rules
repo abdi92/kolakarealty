@@ -10,12 +10,14 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    // Status dibandingkan case-insensitive agar tidak ada outage akibat
+    // perbedaan penulisan 'Aktif' vs 'aktif' pada profil existing.
     function active() {
-      return signedIn() && profile().status == 'Aktif';
+      return signedIn() && profile().status.lower() == 'aktif';
     }
 
     function roleIs(role) {
-      return active() && profile().role == role;
+      return active() && profile().role.lower() == role.lower();
     }
 
     function administrator() {
@@ -39,10 +41,24 @@ service cloud.firestore {
     }
 
     match /entities/{entity}/records/{recordId} {
-      allow read: if active();
-      allow create, update: if administrator()
+      // Matriks role yang disetujui dikunci di level database:
+      // semua role aktif boleh membaca seluruh entitas operasional,
+      // KECUALI direktori pengguna ('pengguna') yang hanya boleh dibaca
+      // Superadmin. Sebelumnya aturan ini hanya ada di kode aplikasi dan
+      // bisa dilewati lewat akses SDK/REST langsung.
+      allow read: if active() && (entity != 'pengguna' || roleIs('Superadmin'));
+
+      allow create: if administrator()
         && !privilegedEntity(entity)
         && request.resource.data.id == recordId;
+
+      // createdAt immutable: update tidak boleh mengubah nilai createdAt
+      // yang sudah tersimpan pada dokumen.
+      allow update: if administrator()
+        && !privilegedEntity(entity)
+        && request.resource.data.id == recordId
+        && (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt);
+
       allow delete: if administrator() && !privilegedEntity(entity);
     }
 

@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    paths:
+      - "modern-v3-firebase/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "modern-v3-firebase/**"
+      - ".github/workflows/ci.yml"
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modern-v3-firebase
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modern-v3-firebase/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm test

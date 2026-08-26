@@ -1,2 +1,7 @@
 node_modules/
 .clasp.json
+.firebase/
+*.log
+.DS_Store
+.env
+.env.*

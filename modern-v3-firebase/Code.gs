@@ -1,13 +1,13 @@
-/**
- * KBR Legal Management — Full Version
+﻿/**
+ * KBR Legal Management â€” Full Version
  * Backend Google Apps Script.
  *
- * Semua modul (Proyek, Sertifikat, Perizinan, Pembeli, dst — 22 modul)
+ * Semua modul (Proyek, Sertifikat, Perizinan, Pembeli, dst â€” 22 modul)
  * memakai SATU mesin CRUD generik yang sama, disimpan dalam SATU sheet
  * bernama "Data" dengan kolom: entity | id | value(JSON) | updatedAt.
  *
  * Kenapa satu mesin, bukan 17 fungsi terpisah? Supaya jalur kode yang
- * diuji/divalidasi hanya satu, dipakai ulang oleh semua modul — jauh
+ * diuji/divalidasi hanya satu, dipakai ulang oleh semua modul â€” jauh
  * lebih kecil kemungkinan ada modul yang bug sendiri-sendiri.
  */
 
@@ -18,6 +18,7 @@ var SESSION_CACHE_PREFIX = 'kbr-auth-session:';
 var SESSION_TTL_SECONDS = 8 * 60 * 60; // 8 jam
 var SUPERADMIN_USERNAME_PROPERTY = 'SUPERADMIN_USERNAME';
 var SUPERADMIN_PASSWORD_PROPERTY = 'SUPERADMIN_PASSWORD';
+var SUPERADMIN_PASSWORD_HASH_PROPERTY = 'SUPERADMIN_PASSWORD_HASH';
 var LOGIN_RATE_PREFIX = 'kbr-login-attempt:';
 var LOGIN_RATE_WINDOW_SECONDS = 15 * 60;
 var LOGIN_RATE_MAX_ATTEMPTS = 5;
@@ -161,10 +162,27 @@ function getSuperadminCredentials_() {
   var properties = PropertiesService.getScriptProperties();
   var username = String(properties.getProperty(SUPERADMIN_USERNAME_PROPERTY) || '').trim();
   var password = String(properties.getProperty(SUPERADMIN_PASSWORD_PROPERTY) || '');
-  if (!username || !password) {
+  // Format yang disarankan: SUPERADMIN_PASSWORD_HASH berisi hash salted
+  // (hasil kredensialPasswordSuperadmin() di editor). Property plaintext
+  // lama tetap didukung sebagai fallback untuk kompatibilitas.
+  var passwordHash = String(properties.getProperty(SUPERADMIN_PASSWORD_HASH_PROPERTY) || '').trim();
+  if (!username || (!password && !passwordHash)) {
     throw new Error('Credential Superadmin belum dikonfigurasi di Script Properties.');
   }
-  return { username: username, password: password };
+  return { username: username, password: password, passwordHash: passwordHash };
+}
+
+/**
+ * Helper sekali pakai (dijalankan manual di editor GAS):
+ * kredensialPasswordSuperadmin('passwordAnda')
+ * lalu simpan hasilnya ke Script Properties SUPERADMIN_PASSWORD_HASH dan
+ * hapus property SUPERADMIN_PASSWORD.
+ */
+function kredensialPasswordSuperadmin(password) {
+  var hash = storePasswordHash_(password);
+  Logger.log('Simpan nilai berikut ke SUPERADMIN_PASSWORD_HASH, lalu hapus SUPERADMIN_PASSWORD:');
+  Logger.log(hash);
+  return hash;
 }
 
 /** Ambil (atau buat) sheet "Data" tempat seluruh modul menyimpan recordnya. */
@@ -207,16 +225,65 @@ function hashPassword_(password) {
   return 'sha256:' + hex;
 }
 
+var PASSWORD_HASH_ITERATIONS = 5000;
+var PASSWORD_SALT_BYTES = 16;
+
+// Hash salted + iterated (format: sha256s:<iter>:<saltHex>:<hashHex>).
+// SHA-256 murni tanpa salt tidak lagi dipakai untuk password baru.
+function hashPasswordSalted_(password, saltHex, iterations) {
+  var iter = Math.max(1, Number(iterations) || PASSWORD_HASH_ITERATIONS);
+  var value = String(password || '');
+  var salted = (saltHex || '') + value;
+  var hex = '';
+  for (var i = 0; i < iter; i++) {
+    var input = i === 0 ? salted : hex + value;
+    var digest = Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA_256,
+      input,
+      Utilities.Charset.UTF_8
+    );
+    hex = digest.map(function (b) {
+      var v = (b + 256) % 256;
+      return (v < 16 ? '0' : '') + v.toString(16);
+    }).join('');
+  }
+  return 'sha256s:' + iter + ':' + (saltHex || '') + ':' + hex;
+}
+
+function newSaltHex_() {
+  return Utilities.base64EncodeWebSafe(Utilities.getRandomValues(PASSWORD_SALT_BYTES))
+    .replace(/[-_]/g, '')
+    .slice(0, 32)
+    .toLowerCase();
+}
+
+function storePasswordHash_(password) {
+  return hashPasswordSalted_(password, newSaltHex_());
+}
+
 function normalizeStoredPasswordHash_(stored) {
   var text = String(stored || '').trim();
   if (!text) return '';
-  if (text.indexOf('sha256:') === 0) return text.toLowerCase();
+  if (
+    text.indexOf('sha256:') === 0 ||
+    /^sha256s:\d+:[0-9a-f]*:[0-9a-f]+$/.test(text)
+  ) {
+    return text.toLowerCase();
+  }
   return hashPassword_(text);
 }
 
 function matchesPassword_(storedHash, rawPassword) {
-  var normalizedHash = normalizeStoredPasswordHash_(storedHash);
-  if (!normalizedHash) return false;
+  var text = String(storedHash || '').trim();
+  if (!text) return false;
+  // Format salted baru
+  var saltedMatch = text.match(/^(sha256s):(\d+):([0-9a-zA-Z]*):([0-9a-f]+)$/i);
+  if (saltedMatch) {
+    return hashPasswordSalted_(rawPassword, saltedMatch[3].toLowerCase(), Number(saltedMatch[2])) ===
+      saltedMatch[1] + ':' + saltedMatch[2] + ':' + saltedMatch[3].toLowerCase() + ':' + saltedMatch[4];
+  }
+  // Format warisan & plaintext fallback
+  var normalizedHash = normalizeStoredPasswordHash_(text);
   return normalizedHash === hashPassword_(rawPassword).toLowerCase();
 }
 
@@ -435,7 +502,9 @@ function authenticateUser(username, password) {
 
   if (
     normalizedUsername === normalizeUsername_(superadmin.username) &&
-    rawPassword === superadmin.password
+    (superadmin.passwordHash
+      ? matchesPassword_(superadmin.passwordHash, rawPassword)
+      : rawPassword === superadmin.password)
   ) {
     var superSession = {
       user: {
@@ -473,9 +542,11 @@ function authenticateUser(username, password) {
     }
   }
 
-  if (!matched) { recordLoginFailure_(normalizedUsername); throw new Error('Username tidak terdaftar atau pengguna nonaktif.'); }
+  // Pesan login diseragamkan agar tidak membocorkan keberadaan username
+  // (mitigasi user enumeration). Rate limit tetap tercatat per attempt.
+  if (!matched) { recordLoginFailure_(normalizedUsername); throw new Error('Username atau password salah.'); }
   var storedPassword = matched.passwordHash || matched.pinHash || matched.password || matched.pin || '';
-  if (!matchesPassword_(storedPassword, rawPassword)) { recordLoginFailure_(normalizedUsername); throw new Error('Password salah.'); }
+  if (!matchesPassword_(storedPassword, rawPassword)) { recordLoginFailure_(normalizedUsername); throw new Error('Username atau password salah.'); }
 
   resetLoginRate_(normalizedUsername);
   var user = matched;
@@ -879,7 +950,7 @@ function deleteRecord(sessionToken, entity, id) {
 
 /**
  * ============================================================
- * Upload Dokumen — lampiran file disimpan di folder Drive milik
+ * Upload Dokumen â€” lampiran file disimpan di folder Drive milik
  * akun yang men-deploy web app ini (sesuai executeAs: USER_DEPLOYING),
  * lalu metadatanya (id/url/nama) disimpan sebagai bagian dari record
  * JSON di sheet "Data" (field "lampiran").
@@ -932,7 +1003,7 @@ function deleteFile(sessionToken, entity, fileId) {
 
 /**
  * ============================================================
- * Backup & Restore Data — ekspor seluruh isi sheet "Data" sebagai
+ * Backup & Restore Data â€” ekspor seluruh isi sheet "Data" sebagai
  * satu file JSON di Drive, supaya bisa diunduh atau dipulihkan
  * kembali kapan saja tanpa bergantung pada versi Google Sheet.
  * ============================================================
@@ -986,7 +1057,7 @@ function listBackups(sessionToken) {
 }
 
 /**
- * Pulihkan seluruh data dari satu file backup — MENIMPA seluruh isi
+ * Pulihkan seluruh data dari satu file backup â€” MENIMPA seluruh isi
  * sheet "Data" saat ini. Dipanggil hanya setelah user mengonfirmasi
  * peringatan di UI, karena aksi ini tidak bisa dibatalkan.
  */
@@ -1018,7 +1089,7 @@ function restoreBackup(sessionToken, fileId) {
 
 /**
  * ============================================================
- * Audit Log — mencatat setiap tindakan penting (create/update/delete/
+ * Audit Log â€” mencatat setiap tindakan penting (create/update/delete/
  * login/logout/backup/restore/password) supaya bisa diaudit siapa
  * melakukan apa dan kapan. Disimpan di sheet "AuditLog".
  * ============================================================
@@ -1103,7 +1174,7 @@ function listAuditLog(sessionToken, limit) {
 
 /**
  * ============================================================
- * Rate limit login — anti brute-force sederhana pakai CacheService.
+ * Rate limit login â€” anti brute-force sederhana pakai CacheService.
  * Jika 5 kali gagal dalam 15 menit, akun/username diblokir sementara.
  * ============================================================
  */
@@ -1153,7 +1224,7 @@ function changeOwnPassword(sessionToken, currentPassword, newPassword) {
   if (!user) throw new Error('Data pengguna tidak ditemukan.');
   var stored = user.passwordHash || user.pinHash || user.password || user.pin || '';
   if (!matchesPassword_(stored, current)) throw new Error('Password lama salah.');
-  user.passwordHash = hashPassword_(next);
+  user.passwordHash = storePasswordHash_(next);
   delete user.password;
   delete user.pin;
   delete user.pinHash;
@@ -1178,7 +1249,7 @@ function resetUserPassword(sessionToken, userId, newPassword) {
   if (!next || next.length < 8) throw new Error('Password baru minimal 8 karakter.');
   var user = findUserByIdRaw_(userId);
   if (!user) throw new Error('Pengguna tidak ditemukan.');
-  user.passwordHash = hashPassword_(next);
+  user.passwordHash = storePasswordHash_(next);
   delete user.password;
   delete user.pin;
   delete user.pinHash;
@@ -1198,7 +1269,7 @@ function resetUserPassword(sessionToken, userId, newPassword) {
 
 /**
  * ============================================================
- * Global Search — pencarian lintas modul untuk topbar aplikasi.
+ * Global Search â€” pencarian lintas modul untuk topbar aplikasi.
  * ============================================================
  */
 function searchAll(sessionToken, query) {
@@ -1240,12 +1311,12 @@ function pickSubtitle_(entity, record) {
   ['proyek', 'unit', 'nomorUnit', 'bank', 'status', 'jenisSurat'].forEach(function (k) {
     if (record[k]) parts.push(String(record[k]));
   });
-  return parts.join(' · ');
+  return parts.join(' Â· ');
 }
 
 /**
  * ============================================================
- * Ringkasan Keuangan — agregasi cashflow, saldo per akun,
+ * Ringkasan Keuangan â€” agregasi cashflow, saldo per akun,
  * total penerimaan & pengeluaran per periode. Dipakai halaman
  * Laporan Keuangan (view read-only).
  * ============================================================
@@ -1351,7 +1422,7 @@ function getFinanceSummary(sessionToken, opts) {
 
 /**
  * ============================================================
- * Kunci Anti Double Booking — satu unit hanya boleh dipegang
+ * Kunci Anti Double Booking â€” satu unit hanya boleh dipegang
  * oleh satu booking/transaksi aktif. Divalidasi di backend agar
  * tidak bisa ditembus lewat manipulasi sisi klien.
  * ============================================================
@@ -1390,7 +1461,7 @@ function assertNoDoubleBooking_(entity, record) {
 
 /**
  * ============================================================
- * Notifikasi Otomatis — pengingat email untuk angsuran/tagihan
+ * Notifikasi Otomatis â€” pengingat email untuk angsuran/tagihan
  * yang akan atau sudah jatuh tempo. Dijalankan oleh trigger
  * harian (lihat installReminderTrigger).
  * ============================================================
@@ -1469,7 +1540,7 @@ function buildReminderBody_(nama, items) {
       : (it.sisaHari === 0 ? 'jatuh tempo HARI INI' : 'jatuh tempo ' + it.sisaHari + ' hari lagi');
     lines.push(
       (idx + 1) + '. ' + it.keterangan +
-      (it.unit ? ' — Unit ' + it.unit : '') +
+      (it.unit ? ' â€” Unit ' + it.unit : '') +
       ' | ' + formatRupiah_(it.nominal) +
       ' | ' + Utilities.formatDate(dateOnly_(it.jatuhTempo), Session.getScriptTimeZone(), 'dd MMM yyyy') +
       ' (' + tempo + ')'
@@ -1518,7 +1589,7 @@ function sendPaymentReminders() {
     try {
       MailApp.sendEmail({
         to: email,
-        subject: 'Pengingat Pembayaran — ' + grouped[key].nama,
+        subject: 'Pengingat Pembayaran â€” ' + grouped[key].nama,
         body: buildReminderBody_(grouped[key].nama, grouped[key].items),
       });
       terkirim++;

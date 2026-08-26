@@ -17,6 +17,42 @@ assert.match(client, /initializeAppCheck/);
 assert.match(rules, /allow create, update, delete: if false;/);
 assert.match(rules, /request\.resource\.data\.id == recordId/);
 assert.match(rules, /match \/auditLogs\/\{logId\}/);
+
+// --- Hardening Fase 1/2 (audit remediation) ---
+// Rules: status case-insensitive, guard read 'pengguna', createdAt immutable.
+assert.match(rules, /status\.lower\(\) == 'aktif'/, "rules harus toleran casing status");
+assert.match(rules, /entity != 'pengguna' \|\| roleIs\('Superadmin'\)/, "read direktori pengguna harus dibatasi Superadmin");
+assert.match(rules, /createdAt.*immutable|request\.resource\.data\.createdAt == resource\.data\.createdAt/, "createdAt wajib immutable");
+// Client: registry memuat booking; saveRecord mempertahankan createdAt.
+assert.match(client, /booking: "PENJUALAN"/, "ENTITY_GROUPS wajib memuat booking");
+assert.match(client, /clean\.createdAt = existing\.data\(\)\.createdAt/, "saveRecord klien wajib mempertahankan createdAt");
+// Admin API: transaksi Firestore + retry.
+assert.match(adminApi, /firestoreBeginTransaction_/);
+assert.match(adminApi, /listCollectionInTransaction_/);
+assert.match(adminApi, /runWithTransaction_/);
+assert.match(adminApi, /TX_MAX_RETRIES/);
+// Kontrak respons {success,message,data,error} + sanitasi.
+assert.match(adminApi, /error: \(error && error\.code\) \|\| ERROR_CODES\.VALIDATION/);
+assert.match(adminApi, /ERROR_CODES.INTERNAL, 'Operasi database sementara gagal\.'/);
+// Tanpa stub/dummy pada ringkasan keuangan.
+assert.doesNotMatch(adminApi, /totalPiutangOpen: 0, totalHutangOpen: 0/, "getFinanceSummary_ tidak boleh mengembalikan stub");
+assert.match(adminApi, /totalPiutangOpen: Math\.round\(openPiutang\)/);
+// deleteFile_ ter-scope folder aplikasi.
+assert.match(adminApi, /File berada di luar penyimpanan dokumen aplikasi/);
+// Registry ALL_ENTITIES: unik + mencakup booking & entitas warisan.
+const allEntitiesMatch = adminApi.match(/var ALL_ENTITIES = \[([\s\S]*?)\];/);
+assert.ok(allEntitiesMatch, "ALL_ENTITIES harus terdefinisi");
+const allEntities = (allEntitiesMatch[1].match(/'([a-z]+)'/g) || []).map((s) => s.replace(/'/g, ""));
+assert.strictEqual(new Set(allEntities).size, allEntities.length, "ALL_ENTITIES tidak boleh punya duplikat");
+assert.ok(allEntities.includes("booking"), "ALL_ENTITIES wajib memuat booking");
+
+// Legacy Sheets backend tetap sehat: salted hashing, superadmin hash, pesan login seragam.
+const legacyApi = read("Code.gs");
+assert.match(legacyApi, /sha256s:/, "hashing password baru harus salted");
+assert.match(legacyApi, /storePasswordHash_/);
+assert.match(legacyApi, /SUPERADMIN_PASSWORD_HASH_PROPERTY/);
+assert.match(legacyApi, /Username atau password salah\./, "pesan login tidak boleh membocorkan username");
+assert.doesNotMatch(legacyApi, /Username tidak terdaftar/);
 assert.doesNotMatch(blogger, /<iframe/i);
 assert.doesNotMatch(blogger, /<script><!\[CDATA\[/i);
 assert.match(blogger, /cdn\.jsdelivr\.net\/gh\/abdi92\/kolakarealty@8fea78c\/modern-v3-firebase\/app\.js/);

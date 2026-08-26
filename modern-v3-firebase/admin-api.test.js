@@ -35,4 +35,35 @@ assert.strictEqual(templatedSettings.customSuratTemplates[0].nama, "Surat Uji");
 assert.throws(() => derive("pengaturan", { customSuratTemplates: [{ id: "invalid", nama: "Surat", isi: "Isi" }] }), /ID template/);
 assert.throws(() => derive("pengaturan", { customSuratTemplates: Array.from({ length: 11 }, (_, index) => ({ id: `tpl-${index}`, nama: "Surat", isi: "Isi" })) }), /maksimal 10/);
 
+// --- Hardening: kode error, sanitasi pesan, konflik transaksi ---
+assert.strictEqual(context.apiError_("VALIDATION_ERROR", "uji").code, "VALIDATION_ERROR");
+
+const sanitizedFirestore = context.sanitizeErrorMessage_("Firestore API gagal (500): {\"error\":\"internal detail rahasia\"}");
+assert.ok(sanitizedFirestore && typeof sanitizedFirestore.message === "string");
+assert.strictEqual(sanitizedFirestore.code, "INTERNAL_ERROR");
+assert.doesNotMatch(sanitizedFirestore.message, /rahasia/, "detail upstream tidak boleh bocor ke klien");
+
+const sanitizedAuth = context.sanitizeErrorMessage_("Firebase Auth Admin gagal (400): API key invalid xyz");
+assert.strictEqual(sanitizedAuth.code, "INTERNAL_ERROR");
+assert.doesNotMatch(sanitizedAuth.message, /API key/);
+
+assert.strictEqual(context.sanitizeErrorMessage_("record.id wajib diisi."), null, "pesan validasi biasa tidak diubah");
+
+try {
+  context.assertNoDoubleBooking_("transaksi", { status: "Booking", proyek: "A", nomorUnit: "U1" }, [
+    { id: "lain", status: "PPJB", proyek: "a", nomorUnit: "u1" },
+  ]);
+  assert.fail("double booking harus ditolak");
+} catch (error) {
+  assert.strictEqual(error.code, "CONFLICT");
+}
+
+// Double booking berbeda unit / status batal tidak boleh salah memblokir.
+context.assertNoDoubleBooking_("transaksi", { status: "Booking", proyek: "A", nomorUnit: "U1" }, [
+  { id: "lain", status: "Batal", proyek: "A", nomorUnit: "U1" },
+]);
+context.assertNoDoubleBooking_("transaksi", { status: "Booking", proyek: "A", nomorUnit: "U1" }, [
+  { id: "lain", status: "PPJB", proyek: "A", nomorUnit: "U2" },
+]);
+
 console.log("Firebase Admin API business-rule tests passed.");

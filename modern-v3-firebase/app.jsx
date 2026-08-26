@@ -9,8 +9,27 @@ import {
   saveRecord as saveFirestoreRecord,
 } from "./firebase-client.js";
 import * as mammoth from "mammoth";
+import { enqueueMutation, getPendingCount, subscribePendingCount, flushQueue } from "./offline-queue.js";
 
 const { useState, useEffect, useRef, useDeferredValue } = React;
+
+// Harus identik dengan PRIVILEGED_ENTITIES pada firebase-client.js (tidak diekspor).
+// Entitas privilegied tidak pernah masuk antrean offline.
+const PRIVILEGED_SYNC_ENTITIES = new Set([
+  "pengguna", "pengaturan", "transaksi", "booking", "approval", "kuitansi", "voucher", "pettycash", "bukubank",
+  "kartuanggaran", "piutang", "hutang", "budgetcontrol", "kartupiutang", "kartubarangmasuk",
+  "barangkeluar", "komisi", "pph", "bphtb", "pengajuankpr", "pencairankpr", "spkborong",
+  "pricelist", "targetmarketing", "tagihan",
+]);
+
+/** True bila error disebabkan gangguan jaringan/offline (bukan validasi/izin). */
+function isNetworkFailure(error) {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
+  if (!error) return false;
+  if (error.name === "TypeError") return true;
+  const message = String(error.message || error || "");
+  return /network|failed to fetch|fetch failed|load failed|networkerror|offline|internet|koneksi/i.test(message);
+}
 
 const APP_VERSION = "4.2.0-document-templates";
 
@@ -629,6 +648,66 @@ function SaveStatus({ status }) {
   );
 }
 
+// ---------- indikator antrean sinkronisasi offline ----------
+// Tanpa animasi (menghormati prefers-reduced-motion); hanya tampil bila ada data pending.
+function SyncStatusBadge({ count }) {
+  if (!count || count <= 0) return null;
+  return (
+    <span
+      role="status"
+      title="Perubahan tersimpan di perangkat dan akan dikirim ke server saat koneksi tersedia."
+      style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#FBF3DF", border: "1px solid #E7D5A6", color: "#8A6414", fontSize: 11.5, fontWeight: 700, letterSpacing: "0.02em", padding: "5px 11px", borderRadius: 999, whiteSpace: "nowrap" }}
+    >
+      {count} perubahan menunggu sinkron
+    </span>
+  );
+}
+
+// ---------- fokus trap untuk modal (Tab siklus, Escape menutup, fokus dipulihkan) ----------
+function useModalFocusTrap(ref, onClose) {
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+  useEffect(() => {
+    const container = ref.current;
+    if (!container || typeof document === "undefined") return undefined;
+    const previousFocused = document.activeElement;
+    const selector = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const firstFocusable = container.querySelector(selector);
+    if (firstFocusable && typeof firstFocusable.focus === "function") firstFocusable.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusables = Array.from(container.querySelectorAll(selector));
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (!container.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+        return;
+      }
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    container.addEventListener("keydown", handleKeyDown);
+    return () => {
+      container.removeEventListener("keydown", handleKeyDown);
+      if (previousFocused && typeof previousFocused.focus === "function") previousFocused.focus();
+    };
+  }, [ref]);
+}
+
 // ---------- Toast global (single source of truth) ----------
 const TOAST_EVENT = "kbr-toast-event";
 function pushToast(message, tone) {
@@ -656,7 +735,7 @@ function ToastContainer() {
     warning: { bg: "#D19A2A", icon: "!" },
   };
   return (
-    <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 10, pointerEvents: "none" }}>
+    <div role="status" aria-live="polite" style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 10, pointerEvents: "none" }}>
       {toasts.map((t) => {
         const tone = tones[t.tone] || tones.info;
         return (
@@ -2414,6 +2493,8 @@ function RecordFormModal({ schema, initial, allData, onCancel, onSubmit }) {
   const [values, setValues] = useState(buildValues);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const modalRef = useRef(null);
+  useModalFocusTrap(modalRef, onCancel);
   const setField = (key, val) => setValues((v) => ({ ...v, [key]: val }));
   const requiredMissing = schema.fields.some((f) => f.required && !String(values[f.key] || "").trim());
   const formulaValidationError = getFormulaValidationError(schema.key, values);
@@ -2791,7 +2872,7 @@ function RecordFormModal({ schema, initial, allData, onCancel, onSubmit }) {
   };
 
   return (
-    <div className="kbr-modal-overlay" onClick={onCancel}>
+    <div ref={modalRef} className="kbr-modal-overlay" onClick={onCancel}>
       <div className="kbr-modal kbr-modal-form" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: `1px solid ${C.border}` }}>
           <div style={{ fontWeight: 700, fontSize: 15.5, color: C.ink }}>{initial ? `Edit ${schema.label}` : `Tambah ${schema.label}`}</div>
@@ -3993,8 +4074,10 @@ function buildRecordDetailPrintHtml(schema, record) {
 
 // ---------- modal detail/tinjau data (review) + cetak satu record ----------
 function RecordDetailModal({ schema, record, onCancel, onEdit, canEdit, allData }) {
+  const detailModalRef = useRef(null);
+  useModalFocusTrap(detailModalRef, onCancel);
   return (
-    <div className="kbr-modal-overlay" onClick={onCancel}>
+    <div ref={detailModalRef} className="kbr-modal-overlay" onClick={onCancel}>
       <div className="kbr-modal kbr-print-area" onClick={(e) => e.stopPropagation()}>
         <div className="no-print" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: `1px solid ${C.border}` }}>
           <div style={{ fontWeight: 700, fontSize: 15.5, color: C.ink }}>Tinjau {schema.label}</div>
@@ -6327,6 +6410,7 @@ function App() {
   const [loginError, setLoginError] = useState("");
   const [data, setData] = useState(null); // null = sedang memuat
   const [loadError, setLoadError] = useState(false);
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const deferredGlobalSearch = useDeferredValue(globalSearch);
 
   const readableEntities = (authSession && authSession.permissions && authSession.permissions.readableEntities) || [];
@@ -6401,18 +6485,69 @@ function App() {
     setActive("dashboard");
   };
 
+  // Putar ulang antrean offline memakai handler Firestore ONLINE (gsCall → firebase-client).
+  const runOfflineFlush = async () => {
+    try {
+      const result = await flushQueue({
+        saveRecord: (entity, record) => gsCall("saveRecord", entity, record),
+        deleteRecord: (entity, id) => gsCall("deleteRecord", entity, id),
+      });
+      if (result.flushed > 0) {
+        // Tandai record lokal sebagai tersinkron (hapus _pendingSync).
+        setData((d) => {
+          if (!d) return d;
+          let changed = false;
+          const next = { ...d };
+          Object.keys(next).forEach((key) => {
+            const list = next[key];
+            if (!Array.isArray(list) || !list.some((r) => r && r._pendingSync)) return;
+            changed = true;
+            next[key] = list.map((r) => {
+              if (!r || !r._pendingSync) return r;
+              const clean = { ...r };
+              delete clean._pendingSync;
+              return clean;
+            });
+          });
+          return changed ? next : d;
+        });
+        pushToast("Sinkronisasi selesai.", "success");
+      }
+    } catch (e) {
+      // Antrean tetap utuh di IndexedDB; dicoba ulang pada kesempatan berikutnya.
+    }
+  };
+
+  // Langganan jumlah perubahan pending di outbox offline.
+  useEffect(() => subscribePendingCount((count) => setPendingSyncCount(count || 0)), []);
+
+  // Sinkronkan otomatis saat koneksi kembali atau saat service worker (Background Sync) meminta flush.
+  useEffect(() => {
+    const handleOnline = () => { runOfflineFlush(); };
+    const handleMessage = (event) => {
+      if (event.data && event.data.type === "KBR_FLUSH_QUEUE") runOfflineFlush();
+    };
+    window.addEventListener("online", handleOnline);
+    if (navigator.serviceWorker) navigator.serviceWorker.addEventListener("message", handleMessage);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      if (navigator.serviceWorker) navigator.serviceWorker.removeEventListener("message", handleMessage);
+    };
+  }, []);
+
   const loadData = () => {
     if (!authSession) return;
     setData(null);
     setLoadError(false);
     gsCall("listAllData")
-      .then((res) => setData(res || {}))
+      .then((res) => { setData(res || {}); runOfflineFlush(); })
       .catch(() => { setData({}); setLoadError(true); });
   };
   useEffect(() => { if (authSession) loadData(); }, [authSession]);
 
   const settingsRecord = data && data.pengaturan && data.pengaturan[0] ? data.pengaturan[0] : DEFAULT_APP_SETTINGS;
-  applyAppSettings(settingsRecord);
+  // Diterapkan lewat efek agar BRAND/C/UI/SIDE modul tidak bermutasi pada setiap render.
+  useEffect(() => { applyAppSettings(settingsRecord); }, [settingsRecord]);
 
   // Registrasi handler global untuk auto-arsip dokumen tercetak (dipanggil dari fungsi print).
   useEffect(() => {
@@ -6510,6 +6645,8 @@ function App() {
     const list = (data && data[entityKey]) || [];
     const isNew = !record.id || !list.some((item) => item.id === record.id);
     const finalRecord = attachWorkflowIds(entityKey, isNew ? { ...record, id: uid() } : { ...record }, data || {});
+    // Penanda _pendingSync hanya untuk tampilan lokal; tidak pernah dikirim ke Firestore.
+    if (finalRecord._pendingSync) delete finalRecord._pendingSync;
     const prevList = list;
     const nextList = isNew ? [finalRecord, ...list] : list.map((r) => (r.id === finalRecord.id ? finalRecord : r));
     setData((d) => ({ ...d, [entityKey]: nextList }));
@@ -6558,6 +6695,18 @@ function App() {
       }
       return true;
     } catch (e) {
+      // Kegagalan jaringan/offline pada entitas non-privilegied: simpan ke outbox perangkat.
+      if (!PRIVILEGED_SYNC_ENTITIES.has(entityKey) && isNetworkFailure(e)) {
+        const queued = await enqueueMutation({ kind: "save", entity: entityKey, id: finalRecord.id, record: finalRecord });
+        if (queued) {
+          setData((d) => ({
+            ...d,
+            [entityKey]: ((d && d[entityKey]) || nextList).map((r) => (r.id === finalRecord.id ? { ...r, _pendingSync: true } : r)),
+          }));
+          pushToast("Tersimpan di perangkat — menunggu sinkronisasi.", "info");
+          return false;
+        }
+      }
       setData((d) => ({ ...d, [entityKey]: prevList }));
       pushToast(`Gagal menyimpan: ${(e && e.message) || "periksa koneksi jaringan"}`, "error");
       return false;
@@ -6599,6 +6748,14 @@ function App() {
       pushToast(`${schemaLabel} berhasil dihapus.`, "success");
       return true;
     } catch (e) {
+      // Kegagalan jaringan/offline pada entitas non-privilegied: antrekan penghapusan.
+      if (!PRIVILEGED_SYNC_ENTITIES.has(entityKey) && isNetworkFailure(e)) {
+        const queued = await enqueueMutation({ kind: "delete", entity: entityKey, id });
+        if (queued) {
+          pushToast("Dihapus di perangkat — menunggu sinkronisasi.", "info");
+          return true;
+        }
+      }
       setData((d) => ({ ...d, [entityKey]: prevList }));
       pushToast(`Gagal menghapus: ${(e && e.message) || "periksa koneksi jaringan"}`, "error");
       return false;
@@ -6952,6 +7109,7 @@ function App() {
         <div className="kbr-hide-menu-wrap" style={{ padding: "0 10px 12px" }}>
           <button
             onClick={handleSidebarToggle}
+            aria-label={sidebarCollapsed ? "Tampilkan menu navigasi" : "Sembunyikan menu navigasi"}
             style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: sidebarCollapsed ? "center" : "flex-start", gap: 8, border: `1px solid ${SIDE.divider}`, background: "rgba(255,255,255,0.05)", color: SIDE.text, borderRadius: UI.radius, padding: "9px 11px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
           >
             <ChevronDown size={14} style={{ transform: sidebarCollapsed ? "rotate(-90deg)" : "rotate(90deg)" }} />
@@ -6989,6 +7147,7 @@ function App() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto" }}>
+            <SyncStatusBadge count={pendingSyncCount} />
             <div style={{ position: "relative" }}>
               <button className="kbr-icon-btn" onClick={() => { setNotifOpen((v) => !v); setUserOpen(false); }} style={{ position: "relative", background: "none", border: "none", cursor: "pointer", padding: 8, color: "#495057" }} aria-label="Notifikasi" aria-expanded={notifOpen}>
                 <Bell size={19} />
