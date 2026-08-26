@@ -13,19 +13,19 @@
   "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@cfa2029/modern-v3-firebase/icons/icon-192.png",
+      "src": "https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@v4.2.0/modern-v3-firebase/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@cfa2029/modern-v3-firebase/icons/icon-512.png",
+      "src": "https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@v4.2.0/modern-v3-firebase/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@cfa2029/modern-v3-firebase/icons/icon-maskable-512.png",
+      "src": "https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@v4.2.0/modern-v3-firebase/icons/icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

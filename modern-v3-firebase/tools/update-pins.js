@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * Tool release: satukan semua pin CDN jsDelivr ke SATU commit SHA.
  *
@@ -18,7 +18,7 @@ const fs = require("fs");
 const path = require("path");
 
 const sha = String(process.argv[2] || "").trim();
-if (!/^[0-9a-f]{7,40}$/.test(sha)) {
+if (!/^([0-9a-f]{7,40}|v[0-9A-Za-z.\-]+)$/.test(sha)) {
   console.error("Pemakaian: node tools/update-pins.js <commit-sha (7-40 hex)>");
   process.exit(1);
 }
