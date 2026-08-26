@@ -57,7 +57,7 @@ assert.doesNotMatch(blogger, /<iframe/i);
 assert.doesNotMatch(blogger, /<script><!\[CDATA\[/i);
 // Pin app.js pada template harus SAMA dengan pin sumber lainnya
 // (KBR_ASSET_BASE_URL pada blogger-runtime-config) — satu SHA per rilis.
-const pinnedSha = (bloggerConfig.match(/kolakarealty@([0-9a-f]{7,40})/) || [])[1];
+const pinnedSha = (bloggerConfig.match(/kolakarealty@([0-9a-f]{7,40}|v[0-9A-Za-z.\-]+)/) || [])[1];
 assert.ok(pinnedSha, "KBR_ASSET_BASE_URL harus memuat pin commit");
 assert.match(blogger, new RegExp(`cdn\\.jsdelivr\\.net\\/gh\\/abdi92\\/kolakarealty@${pinnedSha}\\/modern-v3-firebase\\/app\\.js`));
 assert.match(blogger, /logo-kolakabumirealty\.png" rel="icon"/);

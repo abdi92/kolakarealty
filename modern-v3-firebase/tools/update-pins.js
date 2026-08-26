@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
  * Tool release: satukan semua pin CDN jsDelivr ke SATU commit SHA.
  *
@@ -39,7 +39,7 @@ for (const name of targets) {
   let content = fs.readFileSync(file, "utf8");
   // Ganti pin commit APA PUN (7-40 hex) pada referensi kolakarealty jsDelivr,
   // termasuk ref mutable @main.
-  const re = /(kolakarealty)@([0-9a-f]{7,40}|main)/gi;
+  const re = /(kolakarealty)@([0-9a-f]{7,40}|main|v[0-9A-Za-z.\-]+)/gi;
   const matches = content.match(re) || [];
   if (matches.length === 0) {
     console.log(`${name}: sudah konsisten / tidak ada pin`);
