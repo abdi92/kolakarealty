@@ -34,8 +34,22 @@ var ALL_ENTITIES = [
 ];
 
 function jsonResponse_(payload) {
-  return ContentService.createTextOutput(JSON.stringify(payload))
+  var output = ContentService.createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);
+  // CORS untuk Blogger (blogspot.com) -> script.google.com
+  // ContentService tidak mengekspos setHeader di semua runtime, guard agar tidak throw.
+  try {
+    if (output.setHeader) {
+      output.setHeader('Access-Control-Allow-Origin', '*');
+      output.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      output.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
+  } catch (e) {}
+  return output;
+}
+
+function doOptions() {
+  return jsonResponse_({ success: true });
 }
 
 // Kode error stabil agar klien dapat bercabang tanpa parsing pesan teks.
@@ -70,7 +84,8 @@ function sanitizeErrorMessage_(message) {
   return null;
 }
 
-function doGet() {
+function doGet(e) {
+  // Health check tetap return CORS via jsonResponse_
   return jsonResponse_({ success: true, data: { service: 'KBR Firebase Admin API', status: 'ok' } });
 }
 

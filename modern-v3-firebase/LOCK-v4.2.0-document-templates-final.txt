@@ -1,0 +1,14 @@
+LOCK v4.2.0-document-templates-final
+Date: 2026-09-03
+APP_VERSION: 4.2.0-document-templates (app.jsx:34)
+Package: kbr-office-firebase-blogger@4.2.0
+Firebase: kolakarealty-fd4d7 (abdy.audit@gmail.com)
+CDN: https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@v4.2.0/modern-v3-firebase/
+GAS exec: https://script.google.com/macros/s/AKfycbwglAUaOZpzoMTxvkndi7PH_qR6eFDyrgtgyASA13LZzo-1V1EOkQj9w7SkIlEat1c/exec (health OK)
+app.js SHA256: B1DB51B0071D1ECD9CF8F95A76874CD51A705CFC0579385F183164711BD3E674
+apps-script/Code.gs SHA256: D77C137ECBAF4C7E6A2057BC15D38831331AAB44A7BCCED28922CDC261E0CCE5
+apps-script patch: CORS jsonResponse_ + doOptions (include, deployed)
+Firestore: rules deployed 2026-09-03
+Tests: npm run check PASS (3/3)
+Tag: v4.2.0-document-templates-final (file-based, no git repo)
+Immutability: next changes must be v4.3.0+

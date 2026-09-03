@@ -1,0 +1,42 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "master": {"mode":"primary","description":"Orchestrator for Blogger + GAS + Google Sheets + PWA","prompt":"Read AGENTS.md and .opencode/agents/master.md."},
+    "frontend": {"mode":"subagent","description":"Blogger HTML/CSS/JS frontend"},
+    "backend": {"mode":"subagent","description":"Google Apps Script API"},
+    "database": {"mode":"subagent","description":"Google Sheets database"},
+    "pwa": {"mode":"subagent","description":"PWA offline and synchronization"},
+    "security": {"mode":"subagent","description":"Security audit"},
+    "ui-animation": {"mode":"subagent","description":"UI, animation and interaction"},
+    "qa": {"mode":"subagent","description":"Testing and regression"},
+    "performance": {"mode":"subagent","description":"Performance optimization"},
+    "deployment": {"mode":"subagent","description":"Production deployment"}
+  },
+  "tasks": {
+    "v4.3.0": {
+      "description": "Next iteration after locked v4.2.0-document-templates-final (B1DB51B... / D77C137...)",
+      "base": "v4.2.0-document-templates-final",
+      "branch": "feat/v4.3.0",
+      "workflow": "ANALYZE -> PLAN -> DELEGATE -> IMPLEMENT -> TEST -> AUDIT -> DEPLOY -> LOCK",
+      "locked_files": ["modern-v3-firebase/app.js", "modern-v3-firebase/apps-script/Code.gs"],
+      "agents": {
+        "frontend": "Blogger shell + app.jsx modularization (split 443KB), keep @v4.2.0 CDN until v4.3.0 tag",
+        "backend": "GAS Admin API hardening - migrate manual CORS (1NRSrOX...) to clasp CI with owner OAuth, add audit log retention",
+        "database": "Firestore + Sheets hybrid - no schema break, validate entity registry vs PRIVILEGED_ENTITIES",
+        "pwa": "Offline queue IndexedDB - test flushQueue for non-privileged after CORS fix",
+        "security": "Verify firestore.rules, App Check reCAPTCHA v3 siteKey, API key referrer restriction",
+        "qa": "npm run check + Blogger live E2E (login, transaksi/booking anti-double-booking, approval)",
+        "deployment": "firebase deploy firestore:rules + GAS deploy + Blogger theme + jsDelivr verify 200"
+      },
+      "todo": [
+        "Setup branch feat/v4.3.0 from LOCK v4.2.0 (do not edit locked files directly)",
+        "Fix GAS deploy ownership - re-auth clasp as owner of 1NRSrOX... and automate push",
+        "Update MANUAL_DEPLOY_GUIDE.md for GAS 1NRSrOX... /exec URL rotation",
+        "Modularize app.jsx if needed (per-domain split) after regression suite green",
+        "Run verification: npm run build && npm run check && firebase deploy --dry-run",
+        "Release v4.3.0 tag + update CDN pin (decide @v4.3.0 vs SHA) + RELEASE-v4.3.0.md"
+      ],
+      "release_files": ["modern-v3-firebase/RELEASE-v4.2.0-document-templates-final.md", "modern-v3-firebase/LOCK-v4.2.0-document-templates-final.txt"]
+    }
+  }
+}
