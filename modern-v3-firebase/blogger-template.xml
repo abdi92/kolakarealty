@@ -27,6 +27,7 @@
   <noscript><div id="kbr-loading">JavaScript wajib diaktifkan.</div></noscript>
 
   <script src="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@v4.2.0/modern-v3-firebase/blogger-runtime-config.js"></script>
+  <script>window.KBR_ADMIN_API_URL="https://script.google.com/macros/s/AKfycbwglAUaOZpzoMTxvkndi7PH_qR6eFDyrgtgyASA13LZzo-1V1EOkQj9w7SkIlEat1c/exec";</script>
     <script crossorigin='anonymous' integrity='sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z' src='https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js'></script>
     <script crossorigin='anonymous' integrity='sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1' src='https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js'></script>
   <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/gh/abdi92/kolakarealty@v4.2.0/modern-v3-firebase/app.js"></script>
